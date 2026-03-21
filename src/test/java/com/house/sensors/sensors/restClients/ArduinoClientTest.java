@@ -1,6 +1,6 @@
 package com.house.sensors.sensors.restClients;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
 import org.junit.jupiter.api.Test;

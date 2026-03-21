@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 3.5.6 application that polls Arduino devices on a cron schedule (every 15 minutes), stores temperature/humidity data in PostgreSQL, and exposes REST APIs for retrieval.
+Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (every 15 minutes), stores temperature/humidity data in PostgreSQL, and exposes REST APIs for retrieval.
 
 **Note:** Personal home project for a trusted local network — prioritize functionality and maintainability over enterprise-grade security.
 
-**Stack:** Java 17, Spring Boot (Web, WebFlux, Data JPA), PostgreSQL, Lombok, Maven
+**Stack:** Java 21, Spring Boot (Web, WebFlux, Data JPA), PostgreSQL, Lombok, Maven
 
 ## Build & Run Commands
 

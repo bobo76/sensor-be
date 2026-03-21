@@ -23,7 +23,7 @@ public class WebClientConfig {
     private static final int MAX_CONNECTIONS = 50;
 
     @Bean
-    public WebClient webClient(WebClient.Builder client) {
+    public WebClient webClient() {
         // Configure connection pool
         ConnectionProvider connectionProvider = ConnectionProvider.builder("arduino-pool")
                 .maxConnections(MAX_CONNECTIONS)
@@ -40,6 +40,8 @@ public class WebClientConfig {
                         .addHandlerLast(new WriteTimeoutHandler(WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS))
                 );
 
-        return client.clientConnector(new ReactorClientHttpConnector(httpClient)).build();
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
     }
 }

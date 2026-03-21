@@ -1,6 +1,5 @@
 package com.house.sensors.sensors.restClients;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
@@ -43,7 +43,7 @@ public class ArduinoClient {
             handleNetworkError(ex, machineName);
         } catch (WebClientResponseException ex) {
             handleHttpError(ex, machineName);
-        } catch (IOException ex) {
+        } catch (JacksonException ex) {
             handleParsingError(ex, machineName);
         } catch (Exception ex) {
             handleUnexpectedError(ex, machineName);
@@ -76,7 +76,7 @@ public class ArduinoClient {
         return response;
     }
 
-    private Optional<SensorData> mapResponseToSensorData(String responseBody, String machineName) throws IOException {
+    private Optional<SensorData> mapResponseToSensorData(String responseBody, String machineName) {
         if (responseBody == null || responseBody.isEmpty()) {
             logger.warn("Empty response from Arduino device '{}'", machineName);
             return Optional.empty();
@@ -95,7 +95,7 @@ public class ArduinoClient {
         return NAN_PATTERN.matcher(responseBody).replaceAll(": \"nan\"");
     }
 
-    private SensorData parseJsonToSensorData(String json) throws IOException {
+    private SensorData parseJsonToSensorData(String json) {
         return objectMapper.readValue(json, SensorData.class);
     }
 
@@ -119,7 +119,7 @@ public class ArduinoClient {
         logger.error("HTTP error from Arduino device '{}': {} - {}", machineName, ex.getStatusCode(), ex.getMessage());
     }
 
-    private void handleParsingError(IOException ex, String machineName) {
+    private void handleParsingError(JacksonException ex, String machineName) {
         logger.error("Failed to parse JSON response from Arduino device '{}': {}", machineName, ex.getMessage());
     }
 

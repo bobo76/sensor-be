@@ -1,5 +1,5 @@
 # Stage 1: Build the application
-FROM eclipse-temurin:17-jdk-jammy AS build
+FROM eclipse-temurin:21-jdk-jammy AS build
 
 # Set the working directory inside the container
 WORKDIR /app
