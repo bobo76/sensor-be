@@ -2,8 +2,7 @@ package com.house.sensors.sensors.exception;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -17,9 +16,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @ControllerAdvice
 public class GlobalExceptionHandler {
-    private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
@@ -27,7 +26,7 @@ public class GlobalExceptionHandler {
         ex.getBindingResult().getFieldErrors().forEach(error ->
                 errors.put(error.getField(), error.getDefaultMessage()));
 
-        logger.warn("Validation error: {}", errors);
+        log.warn("Validation error: {}", errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(
@@ -44,7 +43,7 @@ public class GlobalExceptionHandler {
                 .map(ConstraintViolation::getMessage)
                 .collect(Collectors.joining(", "));
 
-        logger.warn("Constraint violation: {}", errors);
+        log.warn("Constraint violation: {}", errors);
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(
@@ -57,7 +56,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingParams(MissingServletRequestParameterException ex) {
-        logger.warn("Missing request parameter: {}", ex.getParameterName());
+        log.warn("Missing request parameter: {}",
+            ex.getParameterName());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse(
@@ -70,7 +70,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        logger.warn("Type mismatch for parameter '{}': {}", ex.getName(), ex.getValue());
+        log.warn("Type mismatch for parameter '{}': {}",
+            ex.getName(), ex.getValue());
         String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
@@ -84,7 +85,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneralException(Exception ex) {
-        logger.error("Unexpected error occurred", ex);
+        log.error("Unexpected error occurred", ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse(

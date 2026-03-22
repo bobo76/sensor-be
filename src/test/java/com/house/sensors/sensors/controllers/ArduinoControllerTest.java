@@ -1,7 +1,7 @@
 package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.entities.Arduino;
-import com.house.sensors.sensors.repositories.ArduinoRepository;
+import com.house.sensors.sensors.services.ArduinoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,8 +11,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +22,7 @@ import static org.mockito.Mockito.*;
 class ArduinoControllerTest {
 
     @Mock
-    private ArduinoRepository arduinoRepository;
+    private ArduinoService arduinoService;
 
     @InjectMocks
     private ArduinoController arduinoController;
@@ -46,8 +46,8 @@ class ArduinoControllerTest {
     @Test
     void getArduinos_shouldReturnAllArduinos() {
         // Arrange
-        List<Arduino> arduinos = Arrays.asList(arduino1, arduino2);
-        when(arduinoRepository.findAll()).thenReturn(arduinos);
+        List<Arduino> arduinos = List.of(arduino1, arduino2);
+        when(arduinoService.findAll()).thenReturn(arduinos);
 
         // Act
         List<Arduino> result = arduinoController.getArduinos();
@@ -55,20 +55,20 @@ class ArduinoControllerTest {
         // Assert
         assertThat(result).hasSize(2);
         assertThat(result).containsExactly(arduino1, arduino2);
-        verify(arduinoRepository).findAll();
+        verify(arduinoService).findAll();
     }
 
     @Test
     void getArduinos_shouldReturnEmptyList_whenNoArduinos() {
         // Arrange
-        when(arduinoRepository.findAll()).thenReturn(List.of());
+        when(arduinoService.findAll()).thenReturn(List.of());
 
         // Act
         List<Arduino> result = arduinoController.getArduinos();
 
         // Assert
         assertThat(result).isEmpty();
-        verify(arduinoRepository).findAll();
+        verify(arduinoService).findAll();
     }
 
     @Test
@@ -83,19 +83,21 @@ class ArduinoControllerTest {
         savedArduino.setHostName("192.168.1.101");
         savedArduino.setIsActive(true);
 
-        when(arduinoRepository.existsByHostName("192.168.1.101")).thenReturn(false);
-        when(arduinoRepository.save(any(Arduino.class))).thenReturn(savedArduino);
+        when(arduinoService.addArduino(any(Arduino.class)))
+            .thenReturn(Optional.of(savedArduino));
 
         // Act
-        ResponseEntity<Arduino> response = arduinoController.addArduino(newArduino);
+        ResponseEntity<Arduino> response =
+            arduinoController.addArduino(newArduino);
 
         // Assert
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getId()).isEqualTo(3L);
-        assertThat(response.getBody().getHostName()).isEqualTo("192.168.1.101");
+        assertThat(response.getBody().getHostName())
+            .isEqualTo("192.168.1.101");
         assertThat(response.getBody().getIsActive()).isTrue();
-        verify(arduinoRepository).save(newArduino);
+        verify(arduinoService).addArduino(newArduino);
     }
 
     @Test
@@ -105,14 +107,16 @@ class ArduinoControllerTest {
         newArduino.setHostName("192.168.1.100");
         newArduino.setIsActive(true);
 
-        when(arduinoRepository.existsByHostName("192.168.1.100")).thenReturn(true);
+        when(arduinoService.addArduino(any(Arduino.class)))
+            .thenReturn(Optional.empty());
 
         // Act
-        ResponseEntity<Arduino> response = arduinoController.addArduino(newArduino);
+        ResponseEntity<Arduino> response =
+            arduinoController.addArduino(newArduino);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNull();
-        verify(arduinoRepository, never()).save(any());
     }
 }

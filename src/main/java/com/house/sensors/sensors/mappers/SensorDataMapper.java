@@ -27,7 +27,10 @@ public class SensorDataMapper {
         }
         return SensorDataDto.builder()
                 .creationDate(value.getCreationDate())
-                .hasError(ERROR_VALUE.equalsIgnoreCase(value.getHumidity()) || ERROR_VALUE.equalsIgnoreCase(value.getTemperature()))
+                .hasError(
+                    ERROR_VALUE.equalsIgnoreCase(value.getHumidity())
+                    || ERROR_VALUE.equalsIgnoreCase(
+                        value.getTemperature()))
                 .humidity(value.getHumidity())
                 .machineName(value.getMachineName())
                 .temperature(value.getTemperature())

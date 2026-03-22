@@ -3,8 +3,8 @@ package com.house.sensors.sensors.controllers;
 import com.house.sensors.sensors.entities.SensorData;
 import com.house.sensors.sensors.mappers.SensorDataMapper;
 import com.house.sensors.sensors.models.SensorDataDto;
-import com.house.sensors.sensors.repositories.SensorDataRepository;
 import com.house.sensors.sensors.restClients.ArduinoClient;
+import com.house.sensors.sensors.services.SensorDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -32,7 +31,7 @@ class DataControllerTest {
     private ArduinoClient arduinoClient;
 
     @Mock
-    private SensorDataRepository sensorDataRepository;
+    private SensorDataService sensorDataService;
 
     @Mock
     private SensorDataMapper sensorDataMapper;
@@ -49,7 +48,8 @@ class DataControllerTest {
     void setUp() {
         now = Instant.now();
 
-        modelSensorData = com.house.sensors.sensors.models.SensorData.builder()
+        modelSensorData =
+            com.house.sensors.sensors.models.SensorData.builder()
                 .machineName("arduino1")
                 .temperature("22.5")
                 .humidity("45.0")
@@ -57,51 +57,58 @@ class DataControllerTest {
                 .build();
 
         entitySensorData = SensorData.builder()
-                .id(1L)
-                .machineName("arduino1")
-                .temperature("22.5")
-                .humidity("45.0")
-                .creationDate(now)
-                .build();
+            .id(1L)
+            .machineName("arduino1")
+            .temperature("22.5")
+            .humidity("45.0")
+            .creationDate(now)
+            .build();
 
         sensorDataDto = SensorDataDto.builder()
-                .machineName("arduino1")
-                .temperature("22.5")
-                .humidity("45.0")
-                .creationDate(now)
-                .hasError(false)
-                .build();
+            .machineName("arduino1")
+            .temperature("22.5")
+            .humidity("45.0")
+            .creationDate(now)
+            .hasError(false)
+            .build();
     }
 
     @Test
     void currentData_shouldReturnSensorData_whenArduinoResponds() {
         // Arrange
-        when(arduinoClient.getSensorData("arduino1")).thenReturn(Optional.of(modelSensorData));
+        when(arduinoClient.getSensorData("arduino1"))
+            .thenReturn(Optional.of(modelSensorData));
 
         // Act
-        ResponseEntity<com.house.sensors.sensors.models.SensorData> response =
-                dataController.currentData("arduino1");
+        ResponseEntity<com.house.sensors.sensors.models.SensorData>
+            response = dataController.currentData("arduino1");
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getMachineName()).isEqualTo("arduino1");
-        assertThat(response.getBody().getTemperature()).isEqualTo("22.5");
-        assertThat(response.getBody().getHumidity()).isEqualTo("45.0");
+        assertThat(response.getBody().getMachineName())
+            .isEqualTo("arduino1");
+        assertThat(response.getBody().getTemperature())
+            .isEqualTo("22.5");
+        assertThat(response.getBody().getHumidity())
+            .isEqualTo("45.0");
         verify(arduinoClient).getSensorData("arduino1");
     }
 
     @Test
     void currentData_shouldReturnNotFound_whenArduinoDoesNotRespond() {
         // Arrange
-        when(arduinoClient.getSensorData("arduino1")).thenReturn(Optional.empty());
+        when(arduinoClient.getSensorData("arduino1"))
+            .thenReturn(Optional.empty());
 
         // Act
-        ResponseEntity<com.house.sensors.sensors.models.SensorData> response =
-                dataController.currentData("arduino1");
+        ResponseEntity<com.house.sensors.sensors.models.SensorData>
+            response = dataController.currentData("arduino1");
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody()).isNull();
         verify(arduinoClient).getSensorData("arduino1");
     }
@@ -111,25 +118,32 @@ class DataControllerTest {
         // Arrange
         Instant startDate = now.minusSeconds(3600);
         Instant endDate = now;
-        List<SensorData> entities = Collections.singletonList(entitySensorData);
+        List<SensorData> entities =
+            Collections.singletonList(entitySensorData);
 
-        when(sensorDataRepository.findByMachineNameAndCreationDateBetween(
-                eq("arduino1"), eq(startDate), eq(endDate), any()))
-                .thenReturn(entities);
-        when(sensorDataMapper.toSensorDataDto(any(SensorData.class)))
-                .thenReturn(sensorDataDto);
+        when(sensorDataService.findHistoricalData(
+                eq("arduino1"), eq(startDate),
+                eq(endDate), eq(1000)))
+            .thenReturn(entities);
+        when(sensorDataMapper.toSensorDataDto(
+                any(SensorData.class)))
+            .thenReturn(sensorDataDto);
 
         // Act
         ResponseEntity<List<SensorDataDto>> response =
-                dataController.historicalData("arduino1", startDate, endDate, 1000);
+            dataController.historicalData(
+                "arduino1", startDate, endDate, 1000);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).hasSize(1);
-        assertThat(response.getBody().get(0).getMachineName()).isEqualTo("arduino1");
-        verify(sensorDataRepository).findByMachineNameAndCreationDateBetween(
-                eq("arduino1"), eq(startDate), eq(endDate), any());
+        assertThat(response.getBody().getFirst().getMachineName())
+            .isEqualTo("arduino1");
+        verify(sensorDataService).findHistoricalData(
+            eq("arduino1"), eq(startDate),
+            eq(endDate), eq(1000));
         verify(sensorDataMapper).toSensorDataDto(entitySensorData);
     }
 
@@ -141,13 +155,15 @@ class DataControllerTest {
 
         // Act
         ResponseEntity<List<SensorDataDto>> response =
-                dataController.historicalData("arduino1", startDate, endDate, 1000);
+            dataController.historicalData(
+                "arduino1", startDate, endDate, 1000);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNull();
-        verify(sensorDataRepository, never()).findByMachineNameAndCreationDateBetween(
-                any(), any(), any(), any());
+        verify(sensorDataService, never())
+            .findHistoricalData(any(), any(), any(), anyInt());
     }
 
     @Test
@@ -156,16 +172,19 @@ class DataControllerTest {
         Instant startDate = now.minusSeconds(3600);
         Instant endDate = now;
 
-        when(sensorDataRepository.findByMachineNameAndCreationDateBetween(
-                eq("arduino1"), eq(startDate), eq(endDate), any()))
-                .thenReturn(List.of());
+        when(sensorDataService.findHistoricalData(
+                eq("arduino1"), eq(startDate),
+                eq(endDate), eq(1000)))
+            .thenReturn(List.of());
 
         // Act
         ResponseEntity<List<SensorDataDto>> response =
-                dataController.historicalData("arduino1", startDate, endDate, 1000);
+            dataController.historicalData(
+                "arduino1", startDate, endDate, 1000);
 
         // Assert
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).isEmpty();
     }

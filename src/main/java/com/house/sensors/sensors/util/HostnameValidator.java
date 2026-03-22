@@ -1,16 +1,15 @@
 package com.house.sensors.sensors.util;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Component
 public class HostnameValidator {
-    private static final Logger logger = LoggerFactory.getLogger(HostnameValidator.class);
 
     // DNS hostname pattern (RFC 1123)
     private static final Pattern HOSTNAME_PATTERN = Pattern.compile(
@@ -49,8 +48,9 @@ public class HostnameValidator {
 
         // Check for blocked patterns (localhost, metadata services)
         if (BLOCKED_PATTERN.matcher(trimmed).matches()) {
-            logger.warn("Blocked hostname attempt: {}", hostname);
-            return ValidationResult.invalid("Hostname not allowed: " + hostname);
+            log.warn("Blocked hostname attempt: {}", hostname);
+            return ValidationResult.invalid(
+                "Hostname not allowed: " + hostname);
         }
 
         // Validate format (IPv4 or DNS name)
@@ -67,15 +67,21 @@ public class HostnameValidator {
 
             // Block loopback addresses
             if (address.isLoopbackAddress()) {
-                logger.warn("Blocked loopback address: {}", hostname);
-                return ValidationResult.invalid("Loopback addresses not allowed");
+                log.warn("Blocked loopback address: {}",
+                    hostname);
+                return ValidationResult.invalid(
+                    "Loopback addresses not allowed");
             }
 
-            logger.debug("Hostname '{}' resolved to {}", hostname, address.getHostAddress());
+            log.debug("Hostname '{}' resolved to {}",
+                hostname, address.getHostAddress());
             return ValidationResult.valid();
         } catch (UnknownHostException e) {
-            logger.warn("Cannot resolve hostname '{}': {}", hostname, e.getMessage());
-            return ValidationResult.invalid("Cannot resolve hostname: " + hostname + " - " + e.getMessage());
+            log.warn("Cannot resolve hostname '{}': {}",
+                hostname, e.getMessage());
+            return ValidationResult.invalid(
+                "Cannot resolve hostname: " + hostname
+                    + " - " + e.getMessage());
         }
     }
 
