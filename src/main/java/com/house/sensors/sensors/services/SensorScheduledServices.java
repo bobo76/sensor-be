@@ -3,7 +3,6 @@ package com.house.sensors.sensors.services;
 import com.house.sensors.sensors.entities.Arduino;
 import com.house.sensors.sensors.entities.SensorData;
 import com.house.sensors.sensors.mappers.SensorDataMapper;
-import com.house.sensors.sensors.repositories.ArduinoRepository;
 import com.house.sensors.sensors.restClients.ArduinoClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +11,8 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import jakarta.annotation.PostConstruct;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,13 +26,25 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 public class SensorScheduledServices {
 
+    private static final int MIN_LOG_INTERVAL_HOURS = 1;
+
     private final ArduinoClient client;
-    private final ArduinoRepository repository;
+    private final ArduinoService arduinoService;
     private final SensorDataService sensorDataService;
     private final SensorDataMapper sensorDataMapper;
 
     @Value("${sensor.polling.log-interval-hours:6}")
-    private int logIntervalHours;
+    private int logIntervalHours = 6;
+
+    @PostConstruct
+    void validateConfig() {
+        if (logIntervalHours < MIN_LOG_INTERVAL_HOURS) {
+            log.warn("sensor.polling.log-interval-hours={} is "
+                + "below minimum, defaulting to {}",
+                logIntervalHours, MIN_LOG_INTERVAL_HOURS);
+            logIntervalHours = MIN_LOG_INTERVAL_HOURS;
+        }
+    }
 
     private volatile Instant lastLogTime = Instant.MIN;
 
@@ -46,7 +59,7 @@ public class SensorScheduledServices {
 
     @Scheduled(cron = "0 0,15,30,45 * * * *")
     public void runTask() {
-        List<Arduino> arduinos = repository.findByIsActiveTrue();
+        List<Arduino> arduinos = arduinoService.findActiveArduinos();
 
         long successCount;
         try (ExecutorService executor =

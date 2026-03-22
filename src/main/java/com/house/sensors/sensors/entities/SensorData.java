@@ -8,20 +8,28 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 
 @AllArgsConstructor
 @Builder
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
 @NoArgsConstructor
 @Table(indexes = {
-    @Index(name = "idx_machine_date", columnList = "machineName, creationDate")
+    @Index(name = "idx_machine_date",
+        columnList = "machineName, creationDate")
 })
 public class SensorData {
+    @EqualsAndHashCode.Include
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

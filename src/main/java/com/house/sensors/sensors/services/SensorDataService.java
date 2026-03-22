@@ -27,7 +27,7 @@ public class SensorDataService {
             Instant endDate,
             int limit) {
         return sensorDataRepository
-            .findByMachineNameAndCreationDateBetween(
+            .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
                 machineName, startDate, endDate,
                 PageRequest.of(0, limit));
     }

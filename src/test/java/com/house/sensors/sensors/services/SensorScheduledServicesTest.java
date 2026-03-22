@@ -3,7 +3,6 @@ package com.house.sensors.sensors.services;
 import com.house.sensors.sensors.entities.Arduino;
 import com.house.sensors.sensors.entities.SensorData;
 import com.house.sensors.sensors.mappers.SensorDataMapper;
-import com.house.sensors.sensors.repositories.ArduinoRepository;
 import com.house.sensors.sensors.restClients.ArduinoClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +17,11 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SensorScheduledServicesTest {
@@ -27,7 +30,7 @@ class SensorScheduledServicesTest {
     private ArduinoClient arduinoClient;
 
     @Mock
-    private ArduinoRepository arduinoRepository;
+    private ArduinoService arduinoService;
 
     @Mock
     private SensorDataService sensorDataService;
@@ -55,7 +58,8 @@ class SensorScheduledServicesTest {
         arduino2.setHostName("192.168.1.101");
         arduino2.setIsActive(true);
 
-        modelData = com.house.sensors.sensors.models.SensorData.builder()
+        modelData =
+            com.house.sensors.sensors.models.SensorData.builder()
                 .machineName("192.168.1.100")
                 .temperature("22.5")
                 .humidity("45.0")
@@ -73,45 +77,62 @@ class SensorScheduledServicesTest {
     @Test
     void runTask_shouldPollAllActiveArduinos() {
         // Arrange
-        List<Arduino> activeArduinos = Arrays.asList(arduino1, arduino2);
-        when(arduinoRepository.findByIsActiveTrue()).thenReturn(activeArduinos);
-        when(arduinoClient.getSensorData(anyString())).thenReturn(Optional.of(modelData));
-        when(sensorDataMapper.toSensorDataEntity(any())).thenReturn(entityData);
-        when(sensorDataService.saveSensorData(any())).thenReturn(entityData);
+        List<Arduino> activeArduinos =
+            Arrays.asList(arduino1, arduino2);
+        when(arduinoService.findActiveArduinos())
+            .thenReturn(activeArduinos);
+        when(arduinoClient.getSensorData(anyString()))
+            .thenReturn(Optional.of(modelData));
+        when(sensorDataMapper.toSensorDataEntity(any()))
+            .thenReturn(entityData);
+        when(sensorDataService.saveSensorData(any()))
+            .thenReturn(entityData);
 
         // Act
         scheduledServices.runTask();
 
         // Assert
-        verify(arduinoRepository).findByIsActiveTrue();
-        verify(arduinoClient, times(2)).getSensorData(anyString());
-        verify(sensorDataMapper, times(2)).toSensorDataEntity(any());
-        verify(sensorDataService, times(2)).saveSensorData(any());
+        verify(arduinoService).findActiveArduinos();
+        verify(arduinoClient, times(2))
+            .getSensorData(anyString());
+        verify(sensorDataMapper, times(2))
+            .toSensorDataEntity(any());
+        verify(sensorDataService, times(2))
+            .saveSensorData(any());
     }
 
     @Test
     void runTask_shouldHandleEmptyArduinoList() {
         // Arrange
-        when(arduinoRepository.findByIsActiveTrue()).thenReturn(List.of());
+        when(arduinoService.findActiveArduinos())
+            .thenReturn(List.of());
 
         // Act
         scheduledServices.runTask();
 
         // Assert
-        verify(arduinoRepository).findByIsActiveTrue();
-        verify(arduinoClient, never()).getSensorData(anyString());
-        verify(sensorDataService, never()).saveSensorData(any());
+        verify(arduinoService).findActiveArduinos();
+        verify(arduinoClient, never())
+            .getSensorData(anyString());
+        verify(sensorDataService, never())
+            .saveSensorData(any());
     }
 
     @Test
     void runTask_shouldContinueOnClientError() {
         // Arrange
-        List<Arduino> activeArduinos = Arrays.asList(arduino1, arduino2);
-        when(arduinoRepository.findByIsActiveTrue()).thenReturn(activeArduinos);
-        when(arduinoClient.getSensorData("192.168.1.100")).thenReturn(Optional.empty());
-        when(arduinoClient.getSensorData("192.168.1.101")).thenReturn(Optional.of(modelData));
-        when(sensorDataMapper.toSensorDataEntity(any())).thenReturn(entityData);
-        when(sensorDataService.saveSensorData(any())).thenReturn(entityData);
+        List<Arduino> activeArduinos =
+            Arrays.asList(arduino1, arduino2);
+        when(arduinoService.findActiveArduinos())
+            .thenReturn(activeArduinos);
+        when(arduinoClient.getSensorData("192.168.1.100"))
+            .thenReturn(Optional.empty());
+        when(arduinoClient.getSensorData("192.168.1.101"))
+            .thenReturn(Optional.of(modelData));
+        when(sensorDataMapper.toSensorDataEntity(any()))
+            .thenReturn(entityData);
+        when(sensorDataService.saveSensorData(any()))
+            .thenReturn(entityData);
 
         // Act
         scheduledServices.runTask();
@@ -119,19 +140,25 @@ class SensorScheduledServicesTest {
         // Assert
         verify(arduinoClient).getSensorData("192.168.1.100");
         verify(arduinoClient).getSensorData("192.168.1.101");
-        verify(sensorDataService, times(1)).saveSensorData(any());
+        verify(sensorDataService, times(1))
+            .saveSensorData(any());
     }
 
     @Test
     void runTask_shouldHandleExceptionDuringPolling() {
         // Arrange
-        List<Arduino> activeArduinos = Arrays.asList(arduino1, arduino2);
-        when(arduinoRepository.findByIsActiveTrue()).thenReturn(activeArduinos);
+        List<Arduino> activeArduinos =
+            Arrays.asList(arduino1, arduino2);
+        when(arduinoService.findActiveArduinos())
+            .thenReturn(activeArduinos);
         when(arduinoClient.getSensorData("192.168.1.100"))
-                .thenThrow(new RuntimeException("Network error"));
-        when(arduinoClient.getSensorData("192.168.1.101")).thenReturn(Optional.of(modelData));
-        when(sensorDataMapper.toSensorDataEntity(any())).thenReturn(entityData);
-        when(sensorDataService.saveSensorData(any())).thenReturn(entityData);
+            .thenThrow(new RuntimeException("Network error"));
+        when(arduinoClient.getSensorData("192.168.1.101"))
+            .thenReturn(Optional.of(modelData));
+        when(sensorDataMapper.toSensorDataEntity(any()))
+            .thenReturn(entityData);
+        when(sensorDataService.saveSensorData(any()))
+            .thenReturn(entityData);
 
         // Act
         scheduledServices.runTask();
@@ -139,15 +166,13 @@ class SensorScheduledServicesTest {
         // Assert
         verify(arduinoClient).getSensorData("192.168.1.100");
         verify(arduinoClient).getSensorData("192.168.1.101");
-        verify(sensorDataService, times(1)).saveSensorData(any());
+        verify(sensorDataService, times(1))
+            .saveSensorData(any());
     }
 
     @Test
     void onApplicationReady_shouldLogStartup() {
-        // Act
+        // Act - verifies method executes without errors
         scheduledServices.onApplicationReady();
-
-        // Assert - This just verifies the method executes without errors
-        // Actual logging verification would require a logging framework mock
     }
 }

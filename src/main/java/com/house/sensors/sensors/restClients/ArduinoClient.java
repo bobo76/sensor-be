@@ -52,7 +52,7 @@ public class ArduinoClient {
 
     private boolean validateHostname(String machineName) {
         HostnameValidator.ValidationResult result =
-            hostnameValidator.validate(machineName);
+            hostnameValidator.validateFormat(machineName);
         if (!result.isValid()) {
             log.error("Invalid hostname '{}': {}",
                 machineName, result.errorMessage());

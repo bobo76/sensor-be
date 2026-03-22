@@ -28,7 +28,6 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
-		<timestamp>${maven.build.timestamp}</timestamp>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -107,6 +106,23 @@
 			</resource>
 		</resources>
 		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>build-timestamp</id>
+						<goals>
+							<goal>timestamp-property</goal>
+						</goals>
+						<configuration>
+							<name>timestamp</name>
+							<pattern>yyyy-MM-dd'T'HH:mm</pattern>
+							<timeZone>America/New_York</timeZone>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>

@@ -9,11 +9,17 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.time.Instant;
 
-@Data
+@Getter
+@Setter
+@ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Entity
 @Table(indexes = {
     @Index(name = "idx_hostname", columnList = "hostName")
@@ -23,6 +29,7 @@ public class Arduino {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @EqualsAndHashCode.Include
     @NotBlank(message = "Host name is required")
     @Column(unique = true)
     private String hostName;
@@ -31,6 +38,7 @@ public class Arduino {
     @Column(nullable = false)
     private Boolean isActive;
 
-    @Column(columnDefinition = "TIMESTAMPTZ(6) DEFAULT NOW()", insertable = false, updatable = false)
+    @Column(columnDefinition = "TIMESTAMPTZ(6) DEFAULT NOW()",
+        insertable = false, updatable = false)
     private Instant creationDate;
 }

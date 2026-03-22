@@ -3,6 +3,7 @@ package com.house.sensors.sensors.services;
 import com.house.sensors.sensors.entities.Arduino;
 import com.house.sensors.sensors.repositories.ArduinoRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,11 +19,15 @@ public class ArduinoService {
         return arduinoRepository.findAll();
     }
 
+    public List<Arduino> findActiveArduinos() {
+        return arduinoRepository.findByIsActiveTrue();
+    }
+
     public Optional<Arduino> addArduino(Arduino arduino) {
-        if (arduinoRepository.existsByHostName(
-                arduino.getHostName())) {
+        try {
+            return Optional.of(arduinoRepository.save(arduino));
+        } catch (DataIntegrityViolationException e) {
             return Optional.empty();
         }
-        return Optional.of(arduinoRepository.save(arduino));
     }
 }
