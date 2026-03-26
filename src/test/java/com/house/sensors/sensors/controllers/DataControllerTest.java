@@ -2,6 +2,11 @@ package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.entities.SensorData;
 import com.house.sensors.sensors.mappers.SensorDataMapper;
+import com.house.sensors.sensors.models.AggregatedDataResponse;
+import com.house.sensors.sensors.models.AggregatedSensorDataDto;
+import com.house.sensors.sensors.models.AggregationTier;
+import com.house.sensors.sensors.models.HistoricalAggregatedDataRequest;
+import com.house.sensors.sensors.models.HistoricalDataRequest;
 import com.house.sensors.sensors.models.SensorDataDto;
 import com.house.sensors.sensors.restClients.ArduinoClient;
 import com.house.sensors.sensors.services.SensorDataService;
@@ -130,9 +135,14 @@ class DataControllerTest {
             .thenReturn(sensorDataDto);
 
         // Act
+        HistoricalDataRequest request = HistoricalDataRequest.builder()
+            .machineName("arduino1")
+            .startDate(startDate)
+            .endDate(endDate)
+            .limit(1000)
+            .build();
         ResponseEntity<List<SensorDataDto>> response =
-            dataController.historicalData(
-                "arduino1", startDate, endDate, 1000);
+            dataController.historicalData(request);
 
         // Assert
         assertThat(response.getStatusCode())
@@ -154,9 +164,14 @@ class DataControllerTest {
         Instant endDate = now.minusSeconds(3600);
 
         // Act
+        HistoricalDataRequest request = HistoricalDataRequest.builder()
+            .machineName("arduino1")
+            .startDate(startDate)
+            .endDate(endDate)
+            .limit(1000)
+            .build();
         ResponseEntity<List<SensorDataDto>> response =
-            dataController.historicalData(
-                "arduino1", startDate, endDate, 1000);
+            dataController.historicalData(request);
 
         // Assert
         assertThat(response.getStatusCode())
@@ -178,14 +193,87 @@ class DataControllerTest {
             .thenReturn(List.of());
 
         // Act
+        HistoricalDataRequest request = HistoricalDataRequest.builder()
+            .machineName("arduino1")
+            .startDate(startDate)
+            .endDate(endDate)
+            .limit(1000)
+            .build();
         ResponseEntity<List<SensorDataDto>> response =
-            dataController.historicalData(
-                "arduino1", startDate, endDate, 1000);
+            dataController.historicalData(request);
 
         // Assert
         assertThat(response.getStatusCode())
             .isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody()).isEmpty();
+    }
+
+    @Test
+    void historicalAggregated_shouldReturnData_whenValidDateRange() {
+        // Arrange
+        Instant startDate = now.minusSeconds(3600);
+        Instant endDate = now;
+        AggregatedDataResponse aggregatedResponse =
+            AggregatedDataResponse.builder()
+                .aggregationTier(AggregationTier.RAW)
+                .data(List.of(AggregatedSensorDataDto.builder()
+                    .bucketTimestamp(now)
+                    .machineName("arduino1")
+                    .avgTemperature(22.5)
+                    .avgHumidity(45.0)
+                    .sampleCount(1L)
+                    .build()))
+                .build();
+
+        when(sensorDataService.findAggregatedHistoricalData(
+                eq("arduino1"), eq(startDate), eq(endDate)))
+            .thenReturn(aggregatedResponse);
+
+        // Act
+        HistoricalAggregatedDataRequest request =
+            HistoricalAggregatedDataRequest.builder()
+                .machineName("arduino1")
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+        ResponseEntity<AggregatedDataResponse> response =
+            dataController.historicalAggregated(request);
+
+        // Assert
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getAggregationTier())
+            .isEqualTo(AggregationTier.RAW);
+        assertThat(response.getBody().getData()).hasSize(1);
+        verify(sensorDataService)
+            .findAggregatedHistoricalData(
+                eq("arduino1"), eq(startDate), eq(endDate));
+    }
+
+    @Test
+    void historicalAggregated_shouldReturnBadRequest_whenStartDateAfterEndDate() {
+        // Arrange
+        Instant startDate = now;
+        Instant endDate = now.minusSeconds(3600);
+
+        // Act
+        HistoricalAggregatedDataRequest request =
+            HistoricalAggregatedDataRequest.builder()
+                .machineName("arduino1")
+                .startDate(startDate)
+                .endDate(endDate)
+                .build();
+        ResponseEntity<AggregatedDataResponse> response =
+            dataController.historicalAggregated(request);
+
+        // Assert
+        assertThat(response.getStatusCode())
+            .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNull();
+        verify(sensorDataService, never())
+            .findAggregatedHistoricalData(
+                any(), any(), any());
     }
 }

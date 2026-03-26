@@ -1,6 +1,9 @@
 package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.mappers.SensorDataMapper;
+import com.house.sensors.sensors.models.AggregatedDataResponse;
+import com.house.sensors.sensors.models.HistoricalAggregatedDataRequest;
+import com.house.sensors.sensors.models.HistoricalDataRequest;
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.models.SensorDataDto;
 import com.house.sensors.sensors.restClients.ArduinoClient;
@@ -8,10 +11,8 @@ import com.house.sensors.sensors.services.SensorDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.Max;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -20,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,29 +55,37 @@ public class DataController {
             + "database for a specific time range")
     @GetMapping("/historicalData")
     public ResponseEntity<List<SensorDataDto>> historicalData(
-            @Parameter(description = "Arduino device name",
-                required = true)
-            @RequestParam @NotBlank String machineName,
-            @Parameter(
-                description = "Start date in ISO-8601 format",
-                required = true)
-            @RequestParam @NotNull Instant startDate,
-            @Parameter(
-                description = "End date in ISO-8601 format",
-                required = true)
-            @RequestParam @NotNull Instant endDate,
-            @Parameter(description = "Max results (default "
-                + "1000, max 10000)")
-            @RequestParam(defaultValue = "1000")
-            @Positive @Max(10000) int limit) {
-        if (startDate.isAfter(endDate)) {
+            @Valid HistoricalDataRequest request) {
+        if (request.getStartDate().isAfter(request.getEndDate())) {
             return ResponseEntity.badRequest().build();
         }
         return ResponseEntity.ok(
             sensorDataService.findHistoricalData(
-                    machineName, startDate, endDate, limit)
+                    request.getMachineName(),
+                    request.getStartDate(),
+                    request.getEndDate(),
+                    request.getLimit())
                 .stream()
                 .map(sensorDataMapper::toSensorDataDto)
                 .toList());
+    }
+
+    @Operation(summary = "Get aggregated historical sensor data",
+        description = "Retrieves historical sensor data aggregated "
+            + "by time buckets. Aggregation tier is auto-detected "
+            + "from the requested time range.")
+    @GetMapping("/historicalAggregated")
+    public ResponseEntity<AggregatedDataResponse>
+            historicalAggregated(
+            @Valid HistoricalAggregatedDataRequest request) {
+        if (request.getStartDate()
+                .isAfter(request.getEndDate())) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(
+            sensorDataService.findAggregatedHistoricalData(
+                request.getMachineName(),
+                request.getStartDate(),
+                request.getEndDate()));
     }
 }
