@@ -1,0 +1,11 @@
+target/
+.git/
+.idea/
+.settings/
+.vscode/
+*.tar
+*.deb
+*.iml
+.classpath
+.project
+.factorypath

@@ -1,12 +1,18 @@
-# Stage 1: Build the application
+# Stage 1: build with Maven inside the image (no host JDK/Maven needed)
 FROM eclipse-temurin:21-jdk-jammy AS build
-
-# Set the working directory inside the container
 WORKDIR /app
-COPY target/sensors-0.0.1-SNAPSHOT.jar app.jar
 
-# Expose the port your application listens on (e.g., 8080 for Spring Boot)
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN ./mvnw -B -q dependency:go-offline
+
+COPY src ./src
+RUN ./mvnw -B -q package -DskipTests \
+ && cp target/*.jar app.jar
+
+# Stage 2: minimal runtime
+FROM eclipse-temurin:21-jre-jammy
+WORKDIR /app
+COPY --from=build /app/app.jar app.jar
 EXPOSE 8080
-
-# Define the command to run your application
 ENTRYPOINT ["java", "-jar", "app.jar"]

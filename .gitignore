@@ -31,3 +31,7 @@ build/
 ### VS Code ###
 .vscode/
 sensor-be.tar
+
+# Large local artifacts (never commit)
+warp-terminal.deb
+sensor-be.tar
