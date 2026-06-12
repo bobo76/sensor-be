@@ -1,19 +1,21 @@
 package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.Arduino;
+import com.house.sensors.sensors.exception.DuplicateResourceException;
 import com.house.sensors.sensors.repositories.ArduinoRepository;
+import com.house.sensors.sensors.util.HostnameValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @RequiredArgsConstructor
 @Service
 public class ArduinoService {
 
     private final ArduinoRepository arduinoRepository;
+    private final HostnameValidator hostnameValidator;
 
     public List<Arduino> findAll() {
         return arduinoRepository.findAll();
@@ -23,11 +25,18 @@ public class ArduinoService {
         return arduinoRepository.findByIsActiveTrue();
     }
 
-    public Optional<Arduino> addArduino(Arduino arduino) {
+    public Arduino addArduino(Arduino arduino) {
+        HostnameValidator.ValidationResult result =
+            hostnameValidator.validateFormat(arduino.getHostName());
+        if (!result.isValid()) {
+            throw new IllegalArgumentException(result.errorMessage());
+        }
         try {
-            return Optional.of(arduinoRepository.save(arduino));
+            return arduinoRepository.save(arduino);
         } catch (DataIntegrityViolationException e) {
-            return Optional.empty();
+            throw new DuplicateResourceException(
+                "Arduino with hostname '" + arduino.getHostName()
+                    + "' already exists");
         }
     }
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.Query;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,26 +24,29 @@ public class AggregatedSensorDataRepository {
             Instant end,
             AggregationTier tier) {
 
+        // Parse each reading independently: a row with one broken
+        // sensor (or any non-numeric value) still contributes its
+        // valid column instead of being dropped entirely.
         String sql = """
             SELECT %s AS bucket_timestamp,
-              AVG(CAST(temperature AS DOUBLE PRECISION)) \
-            AS avg_temp,
-              MIN(CAST(temperature AS DOUBLE PRECISION)) \
-            AS min_temp,
-              MAX(CAST(temperature AS DOUBLE PRECISION)) \
-            AS max_temp,
-              AVG(CAST(humidity AS DOUBLE PRECISION)) \
-            AS avg_hum,
-              MIN(CAST(humidity AS DOUBLE PRECISION)) \
-            AS min_hum,
-              MAX(CAST(humidity AS DOUBLE PRECISION)) \
-            AS max_hum,
+              AVG(temp_val) AS avg_temp,
+              MIN(temp_val) AS min_temp,
+              MAX(temp_val) AS max_temp,
+              AVG(hum_val) AS avg_hum,
+              MIN(hum_val) AS min_hum,
+              MAX(hum_val) AS max_hum,
               COUNT(*) AS sample_count
-            FROM sensor_data
-            WHERE machine_name = :machineName
-              AND creation_date BETWEEN :start AND :end
-              AND LOWER(temperature) != 'nan'
-              AND LOWER(humidity) != 'nan'
+            FROM (
+              SELECT creation_date,
+                CASE WHEN temperature ~ '^-?[0-9]+(\\.[0-9]+)?$' \
+            THEN CAST(temperature AS DOUBLE PRECISION) END AS temp_val,
+                CASE WHEN humidity ~ '^-?[0-9]+(\\.[0-9]+)?$' \
+            THEN CAST(humidity AS DOUBLE PRECISION) END AS hum_val
+              FROM sensor_data
+              WHERE machine_name = :machineName
+                AND creation_date BETWEEN :start AND :end
+            ) AS parsed
+            WHERE temp_val IS NOT NULL OR hum_val IS NOT NULL
             GROUP BY bucket_timestamp
             ORDER BY bucket_timestamp ASC
             """.formatted(tier.getBucketExpression());
@@ -62,7 +66,7 @@ public class AggregatedSensorDataRepository {
                                            String machineName) {
         return AggregatedSensorDataDto.builder()
             .bucketTimestamp(
-                ((java.sql.Timestamp) row[0]).toInstant())
+                ((Timestamp) row[0]).toInstant())
             .machineName(machineName)
             .avgTemperature(toDouble(row[1]))
             .minTemperature(toDouble(row[2]))

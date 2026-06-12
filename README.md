@@ -18,7 +18,7 @@ This system automatically polls registered Arduino devices every 15 minutes, ret
 
 ## Prerequisites
 
-- Java 17 or higher
+- Java 21 or higher
 - PostgreSQL 12 or higher
 - Maven 3.6+ (or use included Maven wrapper `./mvnw`)
 
@@ -215,12 +215,12 @@ http://{hostname}:80/data
 
 The `SensorScheduledServices` component automatically:
 1. Queries all active Arduino devices from the database
-2. Polls each device in parallel using HTTP GET
+2. Polls each device in parallel using HTTP GET (virtual-thread-per-task executor)
 3. Sanitizes and validates the response data
 4. Stores successful readings in the database
 5. Logs success/failure summary
 
-**Schedule:** Every 15 minutes after the previous task completes (`fixedDelay`)
+**Schedule:** Cron-based at wall-clock minutes 00, 15, 30, 45 of every hour (`@Scheduled(cron = "0 0,15,30,45 * * * *")`)
 
 ### Database Schema
 
@@ -248,7 +248,7 @@ The `SensorScheduledServices` component automatically:
 ./mvnw test
 ```
 
-**Note:** Tests require PostgreSQL to be running and accessible.
+**Note:** The test suite is pure unit tests (Mockito) and does not require a running PostgreSQL instance.
 
 ### Code Structure
 See [.claude/CLAUDE.md](CLAUDE.md) for detailed development guidelines and architecture documentation.

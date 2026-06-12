@@ -1,6 +1,7 @@
 package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.entities.Arduino;
+import com.house.sensors.sensors.exception.DuplicateResourceException;
 import com.house.sensors.sensors.mappers.ArduinoMapper;
 import com.house.sensors.sensors.models.ArduinoDto;
 import com.house.sensors.sensors.services.ArduinoService;
@@ -14,10 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -120,7 +120,7 @@ class ArduinoControllerTest {
 
         when(arduinoMapper.toEntity(request)).thenReturn(entity);
         when(arduinoService.addArduino(entity))
-            .thenReturn(Optional.of(savedEntity));
+            .thenReturn(savedEntity);
         when(arduinoMapper.toDto(savedEntity))
             .thenReturn(savedDto);
 
@@ -139,7 +139,7 @@ class ArduinoControllerTest {
     }
 
     @Test
-    void addArduino_shouldReturnBadRequest_whenHostNameAlreadyExists() {
+    void addArduino_shouldPropagateException_whenHostNameAlreadyExists() {
         // Arrange
         ArduinoDto request = ArduinoDto.builder()
             .hostName("192.168.1.100")
@@ -152,15 +152,12 @@ class ArduinoControllerTest {
 
         when(arduinoMapper.toEntity(request)).thenReturn(entity);
         when(arduinoService.addArduino(entity))
-            .thenReturn(Optional.empty());
+            .thenThrow(new DuplicateResourceException(
+                "already exists"));
 
-        // Act
-        ResponseEntity<ArduinoDto> response =
-            arduinoController.addArduino(request);
-
-        // Assert
-        assertThat(response.getStatusCode())
-            .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isNull();
+        // Act + Assert
+        assertThatThrownBy(
+            () -> arduinoController.addArduino(request))
+            .isInstanceOf(DuplicateResourceException.class);
     }
 }

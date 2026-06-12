@@ -25,14 +25,14 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 ./mvnw package && docker build -t sensor-be .
 ```
 
-**Note:** Tests require PostgreSQL running on localhost:5432 with database `sensorsdb`.
+**Note:** The test suite is pure unit tests (Mockito) and does not require a running PostgreSQL instance.
 
 ## Architecture
 
 ### Data Flow
 
 1. `SensorScheduledServices` runs via cron (`0 0,15,30,45 * * * *`) — at minutes 00, 15, 30, 45 of every hour
-2. Queries all active Arduinos from DB, polls each in parallel via `parallelStream()`
+2. Queries all active Arduinos from DB, polls each in parallel via a virtual-thread-per-task executor
 3. `ArduinoClient` uses WebFlux `WebClient` to call `http://{hostname}:80/data` (10s timeout)
 4. Response JSON is sanitized (unquoted `nan` → `"nan"` via regex), mapped to entity, saved to PostgreSQL
 5. Polling summary logged every `sensor.polling.log-interval-hours` hours (default: 6, configurable in `application.properties`)

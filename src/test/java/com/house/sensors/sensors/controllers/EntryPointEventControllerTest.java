@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,16 +75,13 @@ class EntryPointEventControllerTest {
     }
 
     @Test
-    void create_shouldReturnBadRequest_whenUnknownType() {
+    void create_shouldPropagateException_whenUnknownType() {
         when(service.record(request))
             .thenThrow(new IllegalArgumentException("nope"));
 
-        ResponseEntity<EntryPointEventDto> response =
-            controller.create(request);
-
-        assertThat(response.getStatusCode())
-            .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).isNull();
+        assertThatThrownBy(() -> controller.create(request))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("nope");
     }
 
     @Test

@@ -1,20 +1,22 @@
 package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.Arduino;
+import com.house.sensors.sensors.exception.DuplicateResourceException;
 import com.house.sensors.sensors.repositories.ArduinoRepository;
+import com.house.sensors.sensors.util.HostnameValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,7 +26,6 @@ class ArduinoServiceTest {
     @Mock
     private ArduinoRepository arduinoRepository;
 
-    @InjectMocks
     private ArduinoService arduinoService;
 
     private Arduino arduino1;
@@ -32,6 +33,9 @@ class ArduinoServiceTest {
 
     @BeforeEach
     void setUp() {
+        arduinoService = new ArduinoService(
+                arduinoRepository, new HostnameValidator());
+
         arduino1 = new Arduino();
         arduino1.setId(1L);
         arduino1.setHostName("192.168.1.100");
@@ -105,19 +109,17 @@ class ArduinoServiceTest {
             .thenReturn(saved);
 
         // Act
-        Optional<Arduino> result =
-            arduinoService.addArduino(newArduino);
+        Arduino result = arduinoService.addArduino(newArduino);
 
         // Assert
-        assertThat(result).isPresent();
-        assertThat(result.get().getId()).isEqualTo(3L);
-        assertThat(result.get().getHostName())
+        assertThat(result.getId()).isEqualTo(3L);
+        assertThat(result.getHostName())
             .isEqualTo("192.168.1.102");
         verify(arduinoRepository).save(newArduino);
     }
 
     @Test
-    void addArduino_shouldReturnEmpty_whenDuplicateHostname() {
+    void addArduino_shouldThrowDuplicate_whenHostnameExists() {
         // Arrange
         Arduino duplicate = new Arduino();
         duplicate.setHostName("192.168.1.100");
@@ -128,12 +130,25 @@ class ArduinoServiceTest {
                 new DataIntegrityViolationException(
                     "Unique constraint violated"));
 
-        // Act
-        Optional<Arduino> result =
-            arduinoService.addArduino(duplicate);
-
-        // Assert
-        assertThat(result).isEmpty();
+        // Act + Assert
+        assertThatThrownBy(
+            () -> arduinoService.addArduino(duplicate))
+            .isInstanceOf(DuplicateResourceException.class)
+            .hasMessageContaining("192.168.1.100");
         verify(arduinoRepository).save(duplicate);
+    }
+
+    @Test
+    void addArduino_shouldThrowIllegalArgument_whenHostnameInvalid() {
+        // Arrange
+        Arduino invalid = new Arduino();
+        invalid.setHostName("not a hostname!!");
+        invalid.setIsActive(true);
+
+        // Act + Assert
+        assertThatThrownBy(
+            () -> arduinoService.addArduino(invalid))
+            .isInstanceOf(IllegalArgumentException.class);
+        verify(arduinoRepository, never()).save(any());
     }
 }

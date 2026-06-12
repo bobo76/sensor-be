@@ -13,4 +13,8 @@ public interface SensorDataRepository extends JpaRepository<SensorData, Long> {
     List<SensorData> findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
             String machineName, Instant start, Instant end,
             Pageable pageable);
+
+    List<SensorData> findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
+            String machineName, Instant start, Instant end,
+            Pageable pageable);
 }

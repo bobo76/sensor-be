@@ -50,11 +50,14 @@ public class SensorDataService {
             aggregationTierResolver.resolve(startDate, endDate);
 
         List<AggregatedSensorDataDto> data;
+        boolean truncated = false;
         if (tier == AggregationTier.RAW) {
-            data = findHistoricalData(
+            List<SensorData> rawData = sensorDataRepository
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
                     machineName, startDate, endDate,
-                    RAW_TIER_MAX_RESULTS)
-                .stream()
+                    PageRequest.of(0, RAW_TIER_MAX_RESULTS));
+            truncated = rawData.size() == RAW_TIER_MAX_RESULTS;
+            data = rawData.stream()
                 .map(entity -> mapToAggregated(entity, machineName))
                 .toList();
         } else {
@@ -65,6 +68,7 @@ public class SensorDataService {
         return AggregatedDataResponse.builder()
             .aggregationTier(tier)
             .data(data)
+            .truncated(truncated)
             .build();
     }
 

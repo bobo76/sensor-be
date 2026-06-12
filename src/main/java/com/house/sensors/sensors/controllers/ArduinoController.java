@@ -46,11 +46,8 @@ public class ArduinoController {
     public ResponseEntity<ArduinoDto> addArduino(
             @RequestBody @Valid ArduinoDto request) {
         Arduino entity = arduinoMapper.toEntity(request);
-        return arduinoService.addArduino(entity)
-            .map(arduinoMapper::toDto)
-            .map(dto -> ResponseEntity.status(HttpStatus.CREATED)
-                .body(dto))
-            .orElseGet(
-                () -> ResponseEntity.badRequest().build());
+        Arduino saved = arduinoService.addArduino(entity);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(arduinoMapper.toDto(saved));
     }
 }

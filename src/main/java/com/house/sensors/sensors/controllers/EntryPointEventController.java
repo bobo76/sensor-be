@@ -1,6 +1,7 @@
 package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.entities.EntryPointEvent;
+import com.house.sensors.sensors.entities.EntryPointEventType;
 import com.house.sensors.sensors.mappers.EntryPointEventMapper;
 import com.house.sensors.sensors.models.EntryPointEventDto;
 import com.house.sensors.sensors.models.EntryPointEventRequest;
@@ -39,13 +40,9 @@ public class EntryPointEventController {
     @PostMapping("/")
     public ResponseEntity<EntryPointEventDto> create(
             @RequestBody @Valid EntryPointEventRequest request) {
-        try {
-            EntryPointEvent saved = service.record(request);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                .body(mapper.toDto(saved));
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.badRequest().build();
-        }
+        EntryPointEvent saved = service.record(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(mapper.toDto(saved));
     }
 
     @Operation(summary = "List entry point events",
@@ -68,7 +65,7 @@ public class EntryPointEventController {
     @GetMapping("/types")
     public List<String> listTypes() {
         return service.listTypes().stream()
-            .map(t -> t.getName())
+            .map(EntryPointEventType::getName)
             .toList();
     }
 }

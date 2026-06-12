@@ -14,4 +14,5 @@ import java.util.List;
 public class AggregatedDataResponse {
     private AggregationTier aggregationTier;
     private List<AggregatedSensorDataDto> data;
+    private boolean truncated;
 }
