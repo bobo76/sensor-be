@@ -2,6 +2,7 @@ package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.EntryPointEvent;
 import com.house.sensors.sensors.entities.EntryPointEventType;
+import com.house.sensors.sensors.exception.InvalidRequestException;
 import com.house.sensors.sensors.mappers.EntryPointEventMapper;
 import com.house.sensors.sensors.models.EntryPointEventRequest;
 import com.house.sensors.sensors.repositories.EntryPointEventRepository;
@@ -93,7 +94,7 @@ class EntryPointEventServiceTest {
             .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.record(request))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidRequestException.class)
             .hasMessageContaining("bogus");
         verify(eventRepository, never()).save(any());
     }

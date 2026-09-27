@@ -121,7 +121,7 @@ class SensorDataServiceTest {
         when(aggregationTierResolver.resolve(start, end))
             .thenReturn(AggregationTier.RAW);
         when(sensorDataRepository
-                .findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
                     eq("arduino1"), eq(start), eq(end),
                     any(Pageable.class)))
             .thenReturn(List.of(sensorData));
@@ -140,7 +140,37 @@ class SensorDataServiceTest {
         assertThat(dto.getAvgTemperature()).isEqualTo(22.5);
         assertThat(dto.getAvgHumidity()).isEqualTo(45.0);
         assertThat(dto.getSampleCount()).isEqualTo(1L);
+        assertThat(dto.getTemperatureSampleCount()).isEqualTo(1L);
+        assertThat(dto.getHumiditySampleCount()).isEqualTo(1L);
         verifyNoInteractions(aggregatedSensorDataRepository);
+    }
+
+    @Test
+    void findAggregated_shouldReturnAscending_whenRepoReturnsNewestFirst() {
+        // Arrange: repository returns newest-first
+        SensorData newer = SensorData.builder()
+            .machineName("arduino1")
+            .temperature("23.0")
+            .humidity("46.0")
+            .creationDate(end)
+            .build();
+        when(aggregationTierResolver.resolve(start, end))
+            .thenReturn(AggregationTier.RAW);
+        when(sensorDataRepository
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
+                    eq("arduino1"), eq(start), eq(end),
+                    any(Pageable.class)))
+            .thenReturn(List.of(newer, sensorData));
+
+        // Act
+        AggregatedDataResponse response =
+            sensorDataService.findAggregatedHistoricalData(
+                "arduino1", start, end);
+
+        // Assert: output is chronological (oldest first)
+        assertThat(response.getData())
+            .extracting(AggregatedSensorDataDto::getBucketTimestamp)
+            .containsExactly(start, end);
     }
 
     @Test
@@ -155,7 +185,7 @@ class SensorDataServiceTest {
         when(aggregationTierResolver.resolve(start, end))
             .thenReturn(AggregationTier.RAW);
         when(sensorDataRepository
-                .findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
                     eq("arduino1"), eq(start), eq(end),
                     any(Pageable.class)))
             .thenReturn(List.of(nanData));
@@ -169,15 +199,67 @@ class SensorDataServiceTest {
         AggregatedSensorDataDto dto = response.getData().getFirst();
         assertThat(dto.getAvgTemperature()).isNull();
         assertThat(dto.getAvgHumidity()).isEqualTo(45.0);
+        assertThat(dto.getTemperatureSampleCount()).isEqualTo(0L);
+        assertThat(dto.getHumiditySampleCount()).isEqualTo(1L);
     }
 
     @Test
-    void findAggregated_shouldMarkTruncated_whenCapReached() {
-        // Arrange
+    void findAggregated_shouldDropRowsWithNoReadings_inRawTier() {
+        // Arrange: both values unparseable, like the SQL tiers exclude
+        SensorData emptyData = SensorData.builder()
+            .machineName("arduino1")
+            .temperature("nan")
+            .humidity("garbage")
+            .creationDate(end)
+            .build();
         when(aggregationTierResolver.resolve(start, end))
             .thenReturn(AggregationTier.RAW);
         when(sensorDataRepository
-                .findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
+                    eq("arduino1"), eq(start), eq(end),
+                    any(Pageable.class)))
+            .thenReturn(List.of(emptyData, sensorData));
+
+        // Act
+        AggregatedDataResponse response =
+            sensorDataService.findAggregatedHistoricalData(
+                "arduino1", start, end);
+
+        // Assert
+        assertThat(response.getData())
+            .extracting(AggregatedSensorDataDto::getBucketTimestamp)
+            .containsExactly(start);
+    }
+
+    @Test
+    void findAggregated_shouldMarkTruncated_whenOverCap() {
+        // Arrange: one row past the cap signals truncation
+        when(aggregationTierResolver.resolve(start, end))
+            .thenReturn(AggregationTier.RAW);
+        when(sensorDataRepository
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
+                    eq("arduino1"), eq(start), eq(end),
+                    any(Pageable.class)))
+            .thenReturn(Collections.nCopies(
+                RAW_TIER_MAX_RESULTS + 1, sensorData));
+
+        // Act
+        AggregatedDataResponse response =
+            sensorDataService.findAggregatedHistoricalData(
+                "arduino1", start, end);
+
+        // Assert: flagged and trimmed back to the cap
+        assertThat(response.isTruncated()).isTrue();
+        assertThat(response.getData()).hasSize(RAW_TIER_MAX_RESULTS);
+    }
+
+    @Test
+    void findAggregated_shouldNotMarkTruncated_whenExactlyAtCap() {
+        // Arrange: exactly cap rows is not truncation
+        when(aggregationTierResolver.resolve(start, end))
+            .thenReturn(AggregationTier.RAW);
+        when(sensorDataRepository
+                .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
                     eq("arduino1"), eq(start), eq(end),
                     any(Pageable.class)))
             .thenReturn(Collections.nCopies(
@@ -189,7 +271,8 @@ class SensorDataServiceTest {
                 "arduino1", start, end);
 
         // Assert
-        assertThat(response.isTruncated()).isTrue();
+        assertThat(response.isTruncated()).isFalse();
+        assertThat(response.getData()).hasSize(RAW_TIER_MAX_RESULTS);
     }
 
     @Test
@@ -219,7 +302,7 @@ class SensorDataServiceTest {
         assertThat(response.isTruncated()).isFalse();
         assertThat(response.getData()).containsExactly(bucket);
         verify(sensorDataRepository, never())
-            .findByMachineNameAndCreationDateBetweenOrderByCreationDateAsc(
+            .findByMachineNameAndCreationDateBetweenOrderByCreationDateDesc(
                 any(), any(), any(), any());
     }
 }

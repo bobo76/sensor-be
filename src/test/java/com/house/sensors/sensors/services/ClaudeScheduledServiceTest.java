@@ -36,7 +36,8 @@ class ClaudeScheduledServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = spy(new ClaudeScheduledService("test prompt"));
+        service = spy(new ClaudeScheduledService(
+                "test prompt", "haiku"));
         doReturn(processBuilder).when(service)
                 .createProcessBuilder();
         when(processBuilder.redirectInput(

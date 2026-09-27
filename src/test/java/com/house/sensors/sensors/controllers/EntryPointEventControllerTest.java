@@ -2,6 +2,7 @@ package com.house.sensors.sensors.controllers;
 
 import com.house.sensors.sensors.entities.EntryPointEvent;
 import com.house.sensors.sensors.entities.EntryPointEventType;
+import com.house.sensors.sensors.exception.InvalidRequestException;
 import com.house.sensors.sensors.mappers.EntryPointEventMapper;
 import com.house.sensors.sensors.models.EntryPointEventDto;
 import com.house.sensors.sensors.models.EntryPointEventRequest;
@@ -77,10 +78,10 @@ class EntryPointEventControllerTest {
     @Test
     void create_shouldPropagateException_whenUnknownType() {
         when(service.record(request))
-            .thenThrow(new IllegalArgumentException("nope"));
+            .thenThrow(new InvalidRequestException("nope"));
 
         assertThatThrownBy(() -> controller.create(request))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(InvalidRequestException.class)
             .hasMessageContaining("nope");
     }
 

@@ -2,6 +2,7 @@ package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.Arduino;
 import com.house.sensors.sensors.exception.DuplicateResourceException;
+import com.house.sensors.sensors.exception.InvalidRequestException;
 import com.house.sensors.sensors.repositories.ArduinoRepository;
 import com.house.sensors.sensors.util.HostnameValidator;
 import lombok.RequiredArgsConstructor;
@@ -29,14 +30,23 @@ public class ArduinoService {
         HostnameValidator.ValidationResult result =
             hostnameValidator.validateFormat(arduino.getHostName());
         if (!result.isValid()) {
-            throw new IllegalArgumentException(result.errorMessage());
+            throw new InvalidRequestException(result.errorMessage());
+        }
+        if (arduinoRepository.existsByHostName(arduino.getHostName())) {
+            throw duplicateHostname(arduino.getHostName());
         }
         try {
             return arduinoRepository.save(arduino);
         } catch (DataIntegrityViolationException e) {
-            throw new DuplicateResourceException(
-                "Arduino with hostname '" + arduino.getHostName()
-                    + "' already exists");
+            // Safety net for a concurrent insert that slips past the
+            // existsByHostName check; hostname is the only unique
+            // constraint, so this is always a duplicate.
+            throw duplicateHostname(arduino.getHostName());
         }
+    }
+
+    private DuplicateResourceException duplicateHostname(String hostName) {
+        return new DuplicateResourceException(
+            "Arduino with hostname '" + hostName + "' already exists");
     }
 }

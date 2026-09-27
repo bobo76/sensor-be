@@ -26,17 +26,21 @@ public class ClaudeScheduledService {
     private static final int MAX_LOG_OUTPUT_LENGTH = 2000;
 
     private final String prompt;
+    private final String model;
 
     public ClaudeScheduledService(
             @Value("${claude.schedule.prompt:hello Claude}")
-            String prompt) {
+            String prompt,
+            @Value("${claude.schedule.model:haiku}")
+            String model) {
         this.prompt = prompt;
+        this.model = model;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         log.info("ClaudeScheduledService is active, "
-                + "prompt: \"{}\"", prompt);
+                + "model: {}, prompt: \"{}\"", model, prompt);
     }
 
     @Scheduled(cron = "${claude.schedule.cron}")
@@ -89,7 +93,8 @@ public class ClaudeScheduledService {
     }
 
     ProcessBuilder createProcessBuilder() {
-        return new ProcessBuilder("claude", "-p", prompt);
+        return new ProcessBuilder(
+                "claude", "--model", model, "-p", prompt);
     }
 
     private String readProcessOutput(Process process) {

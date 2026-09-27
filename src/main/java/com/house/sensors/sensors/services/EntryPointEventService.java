@@ -2,6 +2,7 @@ package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.EntryPointEvent;
 import com.house.sensors.sensors.entities.EntryPointEventType;
+import com.house.sensors.sensors.exception.InvalidRequestException;
 import com.house.sensors.sensors.mappers.EntryPointEventMapper;
 import com.house.sensors.sensors.models.EntryPointEventRequest;
 import com.house.sensors.sensors.repositories.EntryPointEventRepository;
@@ -24,7 +25,7 @@ public class EntryPointEventService {
     public EntryPointEvent record(EntryPointEventRequest request) {
         EntryPointEventType type = typeRepository
             .findByName(request.getEventType())
-            .orElseThrow(() -> new IllegalArgumentException(
+            .orElseThrow(() -> new InvalidRequestException(
                 "Unknown event type: " + request.getEventType()));
         return eventRepository.save(mapper.toEntity(request, type));
     }

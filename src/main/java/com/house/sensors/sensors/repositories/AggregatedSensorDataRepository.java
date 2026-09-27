@@ -35,7 +35,9 @@ public class AggregatedSensorDataRepository {
               AVG(hum_val) AS avg_hum,
               MIN(hum_val) AS min_hum,
               MAX(hum_val) AS max_hum,
-              COUNT(*) AS sample_count
+              COUNT(*) AS sample_count,
+              COUNT(temp_val) AS temp_count,
+              COUNT(hum_val) AS hum_count
             FROM (
               SELECT creation_date,
                 CASE WHEN temperature ~ '^-?[0-9]+(\\.[0-9]+)?$' \
@@ -75,6 +77,8 @@ public class AggregatedSensorDataRepository {
             .minHumidity(toDouble(row[5]))
             .maxHumidity(toDouble(row[6]))
             .sampleCount(((Number) row[7]).longValue())
+            .temperatureSampleCount(((Number) row[8]).longValue())
+            .humiditySampleCount(((Number) row[9]).longValue())
             .build();
     }
 

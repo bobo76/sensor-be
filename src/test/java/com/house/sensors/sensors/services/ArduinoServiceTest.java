@@ -2,6 +2,7 @@ package com.house.sensors.sensors.services;
 
 import com.house.sensors.sensors.entities.Arduino;
 import com.house.sensors.sensors.exception.DuplicateResourceException;
+import com.house.sensors.sensors.exception.InvalidRequestException;
 import com.house.sensors.sensors.repositories.ArduinoRepository;
 import com.house.sensors.sensors.util.HostnameValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +106,8 @@ class ArduinoServiceTest {
         saved.setHostName("192.168.1.102");
         saved.setIsActive(true);
 
+        when(arduinoRepository.existsByHostName("192.168.1.102"))
+            .thenReturn(false);
         when(arduinoRepository.save(any(Arduino.class)))
             .thenReturn(saved);
 
@@ -125,21 +128,39 @@ class ArduinoServiceTest {
         duplicate.setHostName("192.168.1.100");
         duplicate.setIsActive(true);
 
-        when(arduinoRepository.save(any(Arduino.class)))
-            .thenThrow(
-                new DataIntegrityViolationException(
-                    "Unique constraint violated"));
+        when(arduinoRepository.existsByHostName("192.168.1.100"))
+            .thenReturn(true);
 
         // Act + Assert
         assertThatThrownBy(
             () -> arduinoService.addArduino(duplicate))
             .isInstanceOf(DuplicateResourceException.class)
             .hasMessageContaining("192.168.1.100");
-        verify(arduinoRepository).save(duplicate);
+        verify(arduinoRepository, never()).save(any());
     }
 
     @Test
-    void addArduino_shouldThrowIllegalArgument_whenHostnameInvalid() {
+    void addArduino_shouldThrowDuplicate_whenConcurrentInsertViolatesConstraint() {
+        // Arrange: exists check passes, but a concurrent insert wins
+        Arduino duplicate = new Arduino();
+        duplicate.setHostName("192.168.1.100");
+        duplicate.setIsActive(true);
+
+        when(arduinoRepository.existsByHostName("192.168.1.100"))
+            .thenReturn(false);
+        when(arduinoRepository.save(any(Arduino.class)))
+            .thenThrow(new DataIntegrityViolationException(
+                "Unique constraint violated"));
+
+        // Act + Assert
+        assertThatThrownBy(
+            () -> arduinoService.addArduino(duplicate))
+            .isInstanceOf(DuplicateResourceException.class)
+            .hasMessageContaining("192.168.1.100");
+    }
+
+    @Test
+    void addArduino_shouldThrowInvalidRequest_whenHostnameInvalid() {
         // Arrange
         Arduino invalid = new Arduino();
         invalid.setHostName("not a hostname!!");
@@ -148,7 +169,7 @@ class ArduinoServiceTest {
         // Act + Assert
         assertThatThrownBy(
             () -> arduinoService.addArduino(invalid))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(InvalidRequestException.class);
         verify(arduinoRepository, never()).save(any());
     }
 }

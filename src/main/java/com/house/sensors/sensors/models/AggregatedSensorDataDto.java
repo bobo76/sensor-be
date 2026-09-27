@@ -21,4 +21,6 @@ public class AggregatedSensorDataDto {
     private Double minHumidity;
     private Double maxHumidity;
     private Long sampleCount;
+    private Long temperatureSampleCount;
+    private Long humiditySampleCount;
 }
