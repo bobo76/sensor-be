@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (every 15 minutes), stores temperature/humidity data in PostgreSQL, and exposes REST APIs for retrieval.
+Spring Boot 4.0.8 application that polls Arduino devices on a cron schedule (every 15 minutes), stores temperature/humidity data in PostgreSQL, and exposes REST APIs for retrieval.
 
 **Note:** Personal home project for a trusted local network — prioritize functionality and maintainability over enterprise-grade security.
 
-**Stack:** Java 21, Spring Boot (Web, Data JPA, Actuator), PostgreSQL, Lombok, Maven
+**Stack:** Java 25, Spring Boot (Web, Data JPA, Actuator), PostgreSQL, Lombok, Maven
 
 ## Build & Run Commands
 
@@ -27,7 +27,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 **Note:** The test suite is pure unit tests (Mockito) and does not require a running PostgreSQL instance.
 
-**Mockito agent:** `maven-dependency-plugin` (`properties` goal) + surefire `argLine` load Mockito as a `-javaagent` at test JVM startup, avoiding the JDK 21+ dynamic-agent-loading warnings. If a plugin that sets `argLine` (e.g. JaCoCo) is added, prefix it: `@{argLine} -javaagent:...`.
+**Mockito agent:** `maven-dependency-plugin` (`properties` goal) + surefire `argLine` load Mockito as a `-javaagent` at test JVM startup, avoiding the JDK dynamic-agent-loading warnings. If a plugin that sets `argLine` (e.g. JaCoCo) is added, prefix it: `@{argLine} -javaagent:...`.
 
 ## Architecture
 
