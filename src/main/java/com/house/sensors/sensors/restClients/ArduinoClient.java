@@ -2,19 +2,19 @@ package com.house.sensors.sensors.restClients;
 
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
-import io.netty.channel.ConnectTimeoutException;
-import io.netty.handler.timeout.ReadTimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.UnknownHostException;
+import java.net.http.HttpTimeoutException;
+import java.nio.channels.UnresolvedAddressException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -28,7 +28,7 @@ public class ArduinoClient {
     private static final Pattern NON_FINITE_PATTERN =
         Pattern.compile(":\\s*(?i)(nan|-?inf|ovf)\\b");
 
-    private final WebClient client;
+    private final RestClient client;
     private final ObjectMapper objectMapper;
     private final HostnameValidator hostnameValidator;
 
@@ -40,9 +40,9 @@ public class ArduinoClient {
         try {
             String responseBody = fetchRawDataFromArduino(machineName);
             return mapResponseToSensorData(responseBody, machineName);
-        } catch (WebClientRequestException ex) {
+        } catch (ResourceAccessException ex) {
             handleNetworkError(ex, machineName);
-        } catch (WebClientResponseException ex) {
+        } catch (RestClientResponseException ex) {
             handleHttpError(ex, machineName);
         } catch (JacksonException ex) {
             handleParsingError(ex, machineName);
@@ -68,8 +68,7 @@ public class ArduinoClient {
             .uri("http://" + machineName + ":80/data")
             .accept(MediaType.APPLICATION_JSON)
             .retrieve()
-            .bodyToMono(String.class)
-            .block();
+            .body(String.class);
 
         if (response == null) {
             log.warn("Null response from Arduino device '{}'",
@@ -114,14 +113,13 @@ public class ArduinoClient {
     }
 
     private void handleNetworkError(
-            WebClientRequestException ex, String machineName) {
-        Throwable cause = ex.getCause();
-        if (cause instanceof UnknownHostException) {
+            ResourceAccessException ex, String machineName) {
+        if (hasCause(ex, UnknownHostException.class)
+                || hasCause(ex, UnresolvedAddressException.class)) {
             log.error("Cannot resolve hostname for Arduino "
                 + "device '{}': Device may be offline or "
                 + "hostname is incorrect", machineName);
-        } else if (cause instanceof ConnectTimeoutException
-                || cause instanceof ReadTimeoutException) {
+        } else if (hasCause(ex, HttpTimeoutException.class)) {
             log.error("Timeout connecting to Arduino device "
                 + "'{}': Device not responding", machineName);
         } else {
@@ -131,8 +129,21 @@ public class ArduinoClient {
         }
     }
 
+    // The JDK HttpClient may nest the root cause (e.g. ConnectException
+    // wrapping UnresolvedAddressException), so walk the whole chain
+    private static boolean hasCause(
+            Throwable ex, Class<? extends Throwable> type) {
+        for (Throwable cause = ex.getCause(); cause != null;
+                cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void handleHttpError(
-            WebClientResponseException ex,
+            RestClientResponseException ex,
             String machineName) {
         log.error("HTTP error from Arduino device '{}': "
             + "{} - {}", machineName,

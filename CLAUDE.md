@@ -8,7 +8,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 **Note:** Personal home project for a trusted local network — prioritize functionality and maintainability over enterprise-grade security.
 
-**Stack:** Java 21, Spring Boot (Web, WebFlux, Data JPA, Actuator), PostgreSQL, Lombok, Maven
+**Stack:** Java 21, Spring Boot (Web, Data JPA, Actuator), PostgreSQL, Lombok, Maven
 
 ## Build & Run Commands
 
@@ -35,7 +35,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 1. `SensorScheduledServices` runs via cron (`0 0,15,30,45 * * * *`) — at minutes 00, 15, 30, 45 of every hour
 2. Queries all active Arduinos from DB, polls each in parallel via a virtual-thread-per-task executor
-3. `ArduinoClient` uses WebFlux `WebClient` to call `http://{hostname}:80/data` (10s timeout)
+3. `ArduinoClient` uses `RestClient` (JDK `HttpClient`) to call `http://{hostname}:80/data` (5s connect / 10s response timeout)
 4. Response JSON is sanitized (unquoted `nan`/`inf`/`ovf` → quoted strings via regex), mapped to entity, saved to PostgreSQL
 5. Polling summary logged every `sensor.polling.log-interval-hours` hours (default: 6, configurable in `application.properties`)
 
@@ -67,11 +67,11 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 - `controllers/` — REST endpoints (`DataController`, `ArduinoController`)
 - `services/` — Scheduling (`SensorScheduledServices`), persistence (`SensorDataService`)
-- `restClients/` — `ArduinoClient` (WebClient-based HTTP to Arduinos)
+- `restClients/` — `ArduinoClient` (RestClient-based HTTP to Arduinos)
 - `repositories/` — JPA repositories
 - `entities/` — JPA entities (`Arduino`, `SensorData`)
 - `models/` — DTOs (`SensorData`, `SensorDataDto`)
 - `mappers/` — `SensorDataMapper` (entity ↔ DTO)
-- `config/` — `WebClientConfig`, `CorsConfig`
+- `config/` — `RestClientConfig`, `CorsConfig`
 - `util/` — `HostnameValidator`
 - `exception/` — `GlobalExceptionHandler`

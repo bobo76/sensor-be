@@ -2,20 +2,22 @@ package com.house.sensors.sensors.restClients;
 
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
-import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeFunction;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientRequestException;
-import reactor.core.publisher.Mono;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.test.web.client.ResponseCreator;
+import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
+import java.net.http.HttpTimeoutException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -25,18 +27,18 @@ class ArduinoClientTest {
 
     private static final String VALID_HOST = "192.168.1.50";
 
-    private ArduinoClient clientWithBody(String body) {
-        ExchangeFunction exchange = request -> Mono.just(
-            ClientResponse.create(HttpStatus.OK)
-                .header("Content-Type",
-                    MediaType.APPLICATION_JSON_VALUE)
-                .body(body)
-                .build());
-        WebClient webClient = WebClient.builder()
-            .exchangeFunction(exchange)
-            .build();
+    private ArduinoClient clientRespondingWith(ResponseCreator response) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer.bindTo(builder).build()
+            .expect(requestTo("http://" + VALID_HOST + ":80/data"))
+            .andRespond(response);
         return new ArduinoClient(
-            webClient, new ObjectMapper(), new HostnameValidator());
+            builder.build(), new ObjectMapper(), new HostnameValidator());
+    }
+
+    private ArduinoClient clientWithBody(String body) {
+        return clientRespondingWith(
+            withSuccess(body, MediaType.APPLICATION_JSON));
     }
 
     @Test
@@ -104,13 +106,19 @@ class ArduinoClientTest {
 
     @Test
     void getSensorData_shouldReturnEmpty_whenResponseTimesOut() {
-        ExchangeFunction exchange = request -> Mono.error(
-            new WebClientRequestException(
-                ReadTimeoutException.INSTANCE, request.method(),
-                request.url(), request.headers()));
-        ArduinoClient client = new ArduinoClient(
-            WebClient.builder().exchangeFunction(exchange).build(),
-            new ObjectMapper(), new HostnameValidator());
+        ArduinoClient client = clientRespondingWith(
+            withException(new HttpTimeoutException("request timed out")));
+
+        Optional<SensorData> result =
+            client.getSensorData(VALID_HOST);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getSensorData_shouldReturnEmpty_whenHttpError() {
+        ArduinoClient client = clientRespondingWith(
+            withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         Optional<SensorData> result =
             client.getSensorData(VALID_HOST);
