@@ -8,7 +8,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 **Note:** Personal home project for a trusted local network — prioritize functionality and maintainability over enterprise-grade security.
 
-**Stack:** Java 21, Spring Boot (Web, WebFlux, Data JPA), PostgreSQL, Lombok, Maven
+**Stack:** Java 21, Spring Boot (Web, WebFlux, Data JPA, Actuator), PostgreSQL, Lombok, Maven
 
 ## Build & Run Commands
 
@@ -26,6 +26,8 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 ```
 
 **Note:** The test suite is pure unit tests (Mockito) and does not require a running PostgreSQL instance.
+
+**Mockito agent:** `maven-dependency-plugin` (`properties` goal) + surefire `argLine` load Mockito as a `-javaagent` at test JVM startup, avoiding the JDK 21+ dynamic-agent-loading warnings. If a plugin that sets `argLine` (e.g. JaCoCo) is added, prefix it: `@{argLine} -javaagent:...`.
 
 ## Architecture
 
@@ -48,6 +50,8 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 
 **Swagger UI:** `http://localhost:8080/swagger-ui.html`
 
+**Actuator:** `/actuator/health` (details always shown, includes DB), `/actuator/info` (build info), `/actuator/metrics` (e.g. `/actuator/metrics/jvm.memory.used?tag=area:heap`). Exposure set via `management.endpoints.web.exposure.include` in `application.properties`.
+
 ### Key Implementation Details
 
 - **Scheduling:** Cron-based (`@Scheduled(cron = ...)`), NOT fixedDelay — runs at wall-clock times regardless of previous task duration
@@ -56,6 +60,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 - **Hostname validation:** `HostnameValidator` utility validates hostnames before HTTP requests
 - **Error categorization:** ArduinoClient categorizes failures as network (timeout, DNS), HTTP (4xx/5xx), parsing, or unexpected
 - **Log throttling:** `SensorScheduledServices` only logs polling summaries every N hours (configurable via `sensor.polling.log-interval-hours`)
+- **Error responses:** `GlobalExceptionHandler` returns a uniform `ErrorResponse(status, error, message, timestamp)`. Specific handlers map framework exceptions to proper statuses — 400 (validation, missing/mismatched params, malformed JSON body), 404 (`NoResourceFoundException`, logged at DEBUG only, e.g. browser `/favicon.ico`), 405 (with `Allow` header), 409 (duplicate), 415 (with `Accept` header). The `Exception` catch-all returns 500 with a stack trace, so any new framework exception that should not be a 500 needs its own handler.
 - **DB credentials:** Environment variables `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` with localhost fallback defaults
 
 ### Package Structure
