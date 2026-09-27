@@ -3,8 +3,7 @@ package com.house.sensors.sensors.util;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -25,15 +24,29 @@ public class HostnameValidator {
 
     // Blocked patterns for security
     private static final Pattern BLOCKED_PATTERN = Pattern.compile(
-        "^(localhost|127\\..*|0\\.0\\.0\\.0|::1"
+        "^(localhost|127\\..*|0\\..*"
             + "|metadata\\..*|169\\.254\\..*)$",
         Pattern.CASE_INSENSITIVE
     );
 
+    // An all-digit last label is not a valid DNS name (RFC 3696 §2);
+    // resolvers treat it as a shorthand IPv4 address ("127.1", "2130706433")
+    private static final Pattern NUMERIC_LAST_LABEL_PATTERN =
+        Pattern.compile("(^|\\.)[0-9]+$");
+
     /**
-     * Validates hostname format only (no DNS resolution).
-     * Use this for fast validation in hot paths like
-     * scheduled polling.
+     * Canonical form used for storage and comparison: trimmed and
+     * lower-cased, since hostnames are case-insensitive.
+     */
+    public static String normalize(String hostname) {
+        return hostname == null
+            ? null
+            : hostname.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * Validates hostname format only (no DNS resolution), so devices
+     * that are offline at registration time can still be added.
      */
     public ValidationResult validateFormat(String hostname) {
         if (hostname == null || hostname.trim().isEmpty()) {
@@ -41,7 +54,7 @@ public class HostnameValidator {
                 "Hostname cannot be empty");
         }
 
-        String trimmed = hostname.trim().toLowerCase();
+        String trimmed = normalize(hostname);
 
         if (trimmed.length() > 253) {
             return ValidationResult.invalid(
@@ -59,47 +72,13 @@ public class HostnameValidator {
         boolean isValidHostname =
             HOSTNAME_PATTERN.matcher(trimmed).matches();
 
-        if (!isValidIpv4 && !isValidHostname) {
+        if (!isValidIpv4 && (!isValidHostname
+                || NUMERIC_LAST_LABEL_PATTERN.matcher(trimmed).find())) {
             return ValidationResult.invalid(
                 "Invalid hostname format: " + hostname);
         }
 
         return ValidationResult.valid();
-    }
-
-    /**
-     * Validates hostname format and resolves via DNS.
-     * Use this for user-facing operations like device
-     * registration where confirming reachability is valuable.
-     */
-    public ValidationResult validate(String hostname) {
-        ValidationResult formatResult = validateFormat(hostname);
-        if (!formatResult.isValid()) {
-            return formatResult;
-        }
-
-        String trimmed = hostname.trim().toLowerCase();
-        try {
-            InetAddress address =
-                InetAddress.getByName(trimmed);
-
-            if (address.isLoopbackAddress()) {
-                log.warn("Blocked loopback address: {}",
-                    hostname);
-                return ValidationResult.invalid(
-                    "Loopback addresses not allowed");
-            }
-
-            log.debug("Hostname '{}' resolved to {}",
-                hostname, address.getHostAddress());
-            return ValidationResult.valid();
-        } catch (UnknownHostException e) {
-            log.warn("Cannot resolve hostname '{}': {}",
-                hostname, e.getMessage());
-            return ValidationResult.invalid(
-                "Cannot resolve hostname: " + hostname
-                    + " - " + e.getMessage());
-        }
     }
 
     public record ValidationResult(

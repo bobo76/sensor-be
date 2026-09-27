@@ -34,7 +34,7 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 1. `SensorScheduledServices` runs via cron (`0 0,15,30,45 * * * *`) — at minutes 00, 15, 30, 45 of every hour
 2. Queries all active Arduinos from DB, polls each in parallel via a virtual-thread-per-task executor
 3. `ArduinoClient` uses WebFlux `WebClient` to call `http://{hostname}:80/data` (10s timeout)
-4. Response JSON is sanitized (unquoted `nan` → `"nan"` via regex), mapped to entity, saved to PostgreSQL
+4. Response JSON is sanitized (unquoted `nan`/`inf`/`ovf` → quoted strings via regex), mapped to entity, saved to PostgreSQL
 5. Polling summary logged every `sensor.polling.log-interval-hours` hours (default: 6, configurable in `application.properties`)
 
 ### REST API
@@ -51,7 +51,8 @@ Spring Boot 4.0.4 application that polls Arduino devices on a cron schedule (eve
 ### Key Implementation Details
 
 - **Scheduling:** Cron-based (`@Scheduled(cron = ...)`), NOT fixedDelay — runs at wall-clock times regardless of previous task duration
-- **NaN handling:** `ArduinoClient` uses `Pattern` regex to convert unquoted `nan` to `"nan"` before JSON parsing
+- **NaN handling:** `ArduinoClient` uses `Pattern` regex to quote the bare `nan`/`inf`/`ovf` tokens Arduino's `printFloat` emits before JSON parsing; `SensorValueParser.NUMERIC_REGEX` is the single definition of a numeric reading, shared by the RAW tier and the aggregation SQL
+- **Aggregation time zone:** bucket boundaries use `sensor.aggregation.time-zone` (env `SENSOR_TIME_ZONE`, default `America/New_York`), independent of JVM/DB zone
 - **Hostname validation:** `HostnameValidator` utility validates hostnames before HTTP requests
 - **Error categorization:** ArduinoClient categorizes failures as network (timeout, DNS), HTTP (4xx/5xx), parsing, or unexpected
 - **Log throttling:** `SensorScheduledServices` only logs polling summaries every N hours (configurable via `sensor.polling.log-interval-hours`)

@@ -106,7 +106,7 @@ class ArduinoServiceTest {
         saved.setHostName("192.168.1.102");
         saved.setIsActive(true);
 
-        when(arduinoRepository.existsByHostName("192.168.1.102"))
+        when(arduinoRepository.existsByHostNameIgnoreCase("192.168.1.102"))
             .thenReturn(false);
         when(arduinoRepository.save(any(Arduino.class)))
             .thenReturn(saved);
@@ -128,7 +128,7 @@ class ArduinoServiceTest {
         duplicate.setHostName("192.168.1.100");
         duplicate.setIsActive(true);
 
-        when(arduinoRepository.existsByHostName("192.168.1.100"))
+        when(arduinoRepository.existsByHostNameIgnoreCase("192.168.1.100"))
             .thenReturn(true);
 
         // Act + Assert
@@ -146,7 +146,7 @@ class ArduinoServiceTest {
         duplicate.setHostName("192.168.1.100");
         duplicate.setIsActive(true);
 
-        when(arduinoRepository.existsByHostName("192.168.1.100"))
+        when(arduinoRepository.existsByHostNameIgnoreCase("192.168.1.100"))
             .thenReturn(false);
         when(arduinoRepository.save(any(Arduino.class)))
             .thenThrow(new DataIntegrityViolationException(
@@ -157,6 +157,43 @@ class ArduinoServiceTest {
             () -> arduinoService.addArduino(duplicate))
             .isInstanceOf(DuplicateResourceException.class)
             .hasMessageContaining("192.168.1.100");
+    }
+
+    @Test
+    void addArduino_shouldNormalizeHostname_beforeCheckAndSave() {
+        // Arrange
+        Arduino newArduino = new Arduino();
+        newArduino.setHostName("  Sensor1 ");
+        newArduino.setIsActive(true);
+
+        when(arduinoRepository.existsByHostNameIgnoreCase("sensor1"))
+            .thenReturn(false);
+        when(arduinoRepository.save(any(Arduino.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        Arduino result = arduinoService.addArduino(newArduino);
+
+        // Assert
+        assertThat(result.getHostName()).isEqualTo("sensor1");
+        verify(arduinoRepository).existsByHostNameIgnoreCase("sensor1");
+    }
+
+    @Test
+    void addArduino_shouldThrowDuplicate_whenHostnameDiffersOnlyByCase() {
+        // Arrange
+        Arduino duplicate = new Arduino();
+        duplicate.setHostName("Sensor1");
+        duplicate.setIsActive(true);
+
+        when(arduinoRepository.existsByHostNameIgnoreCase("sensor1"))
+            .thenReturn(true);
+
+        // Act + Assert
+        assertThatThrownBy(
+            () -> arduinoService.addArduino(duplicate))
+            .isInstanceOf(DuplicateResourceException.class);
+        verify(arduinoRepository, never()).save(any());
     }
 
     @Test

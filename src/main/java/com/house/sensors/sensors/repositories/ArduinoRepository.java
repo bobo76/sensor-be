@@ -9,5 +9,5 @@ import java.util.List;
 @Repository
 public interface ArduinoRepository extends JpaRepository<Arduino, Long> {
     List<Arduino> findByIsActiveTrue();
-    boolean existsByHostName(String hostName);
+    boolean existsByHostNameIgnoreCase(String hostName);
 }

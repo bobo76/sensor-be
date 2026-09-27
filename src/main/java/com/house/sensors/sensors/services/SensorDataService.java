@@ -6,6 +6,7 @@ import com.house.sensors.sensors.models.AggregatedSensorDataDto;
 import com.house.sensors.sensors.models.AggregationTier;
 import com.house.sensors.sensors.repositories.AggregatedSensorDataRepository;
 import com.house.sensors.sensors.repositories.SensorDataRepository;
+import com.house.sensors.sensors.util.SensorValueParser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -82,8 +83,8 @@ public class SensorDataService {
 
     private AggregatedSensorDataDto mapToAggregated(
             SensorData entity, String machineName) {
-        Double temp = parseDouble(entity.getTemperature());
-        Double hum = parseDouble(entity.getHumidity());
+        Double temp = SensorValueParser.parse(entity.getTemperature());
+        Double hum = SensorValueParser.parse(entity.getHumidity());
         return AggregatedSensorDataDto.builder()
             .bucketTimestamp(entity.getCreationDate())
             .machineName(machineName)
@@ -102,17 +103,5 @@ public class SensorDataService {
     private boolean hasAnyReading(AggregatedSensorDataDto dto) {
         return dto.getAvgTemperature() != null
             || dto.getAvgHumidity() != null;
-    }
-
-    private Double parseDouble(String value) {
-        if (value == null
-                || value.equalsIgnoreCase("nan")) {
-            return null;
-        }
-        try {
-            return Double.parseDouble(value);
-        } catch (NumberFormatException e) {
-            return null;
-        }
     }
 }

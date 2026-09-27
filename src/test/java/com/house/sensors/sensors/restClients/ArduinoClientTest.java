@@ -2,12 +2,14 @@ package com.house.sensors.sensors.restClients;
 
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
+import io.netty.handler.timeout.ReadTimeoutException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import tools.jackson.databind.ObjectMapper;
 
@@ -85,6 +87,35 @@ class ArduinoClientTest {
         assertThat(result).isPresent();
         assertThat(result.get().getTemperature()).isEqualTo("nan");
         assertThat(result.get().getHumidity()).isEqualTo("45.0");
+    }
+
+    @Test
+    void getSensorData_shouldSanitizeUnquotedInfAndOvf() {
+        ArduinoClient client = clientWithBody(
+            "{\"temperature\": inf, \"humidity\": ovf}");
+
+        Optional<SensorData> result =
+            client.getSensorData(VALID_HOST);
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getTemperature()).isEqualTo("inf");
+        assertThat(result.get().getHumidity()).isEqualTo("ovf");
+    }
+
+    @Test
+    void getSensorData_shouldReturnEmpty_whenResponseTimesOut() {
+        ExchangeFunction exchange = request -> Mono.error(
+            new WebClientRequestException(
+                ReadTimeoutException.INSTANCE, request.method(),
+                request.url(), request.headers()));
+        ArduinoClient client = new ArduinoClient(
+            WebClient.builder().exchangeFunction(exchange).build(),
+            new ObjectMapper(), new HostnameValidator());
+
+        Optional<SensorData> result =
+            client.getSensorData(VALID_HOST);
+
+        assertThat(result).isEmpty();
     }
 
     @Test

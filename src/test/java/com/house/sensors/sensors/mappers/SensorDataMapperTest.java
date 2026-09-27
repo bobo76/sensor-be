@@ -132,6 +132,25 @@ class SensorDataMapperTest {
     }
 
     @Test
+    void toSensorDataDto_shouldDetectError_forInfAndOvf() {
+        SensorData infEntity = SensorData.builder()
+                .machineName("arduino1")
+                .temperature("inf")
+                .humidity("45.0")
+                .creationDate(now)
+                .build();
+        SensorData ovfEntity = SensorData.builder()
+                .machineName("arduino1")
+                .temperature("22.5")
+                .humidity("ovf")
+                .creationDate(now)
+                .build();
+
+        assertThat(mapper.toSensorDataDto(infEntity).isHasError()).isTrue();
+        assertThat(mapper.toSensorDataDto(ovfEntity).isHasError()).isTrue();
+    }
+
+    @Test
     void toSensorDataDto_shouldDetectError_caseInsensitive() {
         // Arrange - Test with NaN, NAN, Nan
         SensorData entity1 = SensorData.builder()

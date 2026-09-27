@@ -4,18 +4,28 @@ import com.house.sensors.sensors.models.AggregatedSensorDataDto;
 import com.house.sensors.sensors.models.AggregationTier;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
-import lombok.RequiredArgsConstructor;
+import com.house.sensors.sensors.util.SensorValueParser;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Repository
-@RequiredArgsConstructor
 public class AggregatedSensorDataRepository {
 
     private final EntityManager entityManager;
+    private final ZoneId timeZone;
+
+    public AggregatedSensorDataRepository(
+            EntityManager entityManager,
+            @Value("${sensor.aggregation.time-zone}") ZoneId timeZone) {
+        this.entityManager = entityManager;
+        this.timeZone = timeZone;
+    }
 
     @SuppressWarnings("unchecked")
     public List<AggregatedSensorDataDto> findAggregated(
@@ -27,8 +37,11 @@ public class AggregatedSensorDataRepository {
         // Parse each reading independently: a row with one broken
         // sensor (or any non-numeric value) still contributes its
         // valid column instead of being dropped entirely.
+        // Buckets are computed on house-local wall-clock time so
+        // daily/weekly/monthly boundaries fall on local midnight,
+        // regardless of the DB session or JVM time zone.
         String sql = """
-            SELECT %s AS bucket_timestamp,
+            SELECT (%1$s) AT TIME ZONE :timeZone AS bucket_timestamp,
               AVG(temp_val) AS avg_temp,
               MIN(temp_val) AS min_temp,
               MAX(temp_val) AS max_temp,
@@ -39,10 +52,10 @@ public class AggregatedSensorDataRepository {
               COUNT(temp_val) AS temp_count,
               COUNT(hum_val) AS hum_count
             FROM (
-              SELECT creation_date,
-                CASE WHEN temperature ~ '^-?[0-9]+(\\.[0-9]+)?$' \
+              SELECT creation_date AT TIME ZONE :timeZone AS local_ts,
+                CASE WHEN temperature ~ '%2$s' \
             THEN CAST(temperature AS DOUBLE PRECISION) END AS temp_val,
-                CASE WHEN humidity ~ '^-?[0-9]+(\\.[0-9]+)?$' \
+                CASE WHEN humidity ~ '%2$s' \
             THEN CAST(humidity AS DOUBLE PRECISION) END AS hum_val
               FROM sensor_data
               WHERE machine_name = :machineName
@@ -51,12 +64,14 @@ public class AggregatedSensorDataRepository {
             WHERE temp_val IS NOT NULL OR hum_val IS NOT NULL
             GROUP BY bucket_timestamp
             ORDER BY bucket_timestamp ASC
-            """.formatted(tier.getBucketExpression());
+            """.formatted(tier.getBucketExpression(),
+                SensorValueParser.NUMERIC_REGEX);
 
         Query query = entityManager.createNativeQuery(sql);
         query.setParameter("machineName", machineName);
         query.setParameter("start", start);
         query.setParameter("end", end);
+        query.setParameter("timeZone", timeZone.getId());
 
         List<Object[]> rows = query.getResultList();
         return rows.stream()
@@ -67,8 +82,7 @@ public class AggregatedSensorDataRepository {
     private AggregatedSensorDataDto mapRow(Object[] row,
                                            String machineName) {
         return AggregatedSensorDataDto.builder()
-            .bucketTimestamp(
-                ((Timestamp) row[0]).toInstant())
+            .bucketTimestamp(toInstant(row[0]))
             .machineName(machineName)
             .avgTemperature(toDouble(row[1]))
             .minTemperature(toDouble(row[2]))
@@ -80,6 +94,18 @@ public class AggregatedSensorDataRepository {
             .temperatureSampleCount(((Number) row[8]).longValue())
             .humiditySampleCount(((Number) row[9]).longValue())
             .build();
+    }
+
+    // Hibernate 7 maps timestamptz to Instant/OffsetDateTime; accept
+    // Timestamp too in case the dialect or driver config changes.
+    private Instant toInstant(Object value) {
+        return switch (value) {
+            case Instant instant -> instant;
+            case OffsetDateTime offsetDateTime -> offsetDateTime.toInstant();
+            case Timestamp timestamp -> timestamp.toInstant();
+            default -> throw new IllegalStateException(
+                "Unexpected bucket_timestamp type: " + value.getClass());
+        };
     }
 
     private Double toDouble(Object value) {

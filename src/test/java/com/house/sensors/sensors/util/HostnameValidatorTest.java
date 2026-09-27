@@ -3,6 +3,8 @@ package com.house.sensors.sensors.util;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -193,46 +195,36 @@ class HostnameValidatorTest {
     }
 
     @Nested
-    class ValidateWithDns {
+    class NumericShorthand {
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "127.1", "0", "2130706433", "0.1.2.3", "sensor.123"})
+        void shouldRejectNumericShorthandAndZeroNetwork(String host) {
+            assertThat(validator.validateFormat(host).isValid())
+                .isFalse();
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"sensor1", "123sensor", "esp32.local"})
+        void shouldAcceptHostnamesWithDigits(String host) {
+            assertThat(validator.validateFormat(host).isValid())
+                .isTrue();
+        }
+    }
+
+    @Nested
+    class Normalize {
 
         @Test
-        void shouldAcceptValidPublicIP() {
-            HostnameValidator.ValidationResult result =
-                validator.validate("8.8.8.8");
-
-            assertThat(result.isValid()).isTrue();
+        void shouldTrimAndLowerCase() {
+            assertThat(HostnameValidator.normalize("  Sensor1.LOCAL "))
+                .isEqualTo("sensor1.local");
         }
 
         @Test
-        void shouldRejectUnresolvableHostname() {
-            HostnameValidator.ValidationResult result =
-                validator.validate(
-                    "this-hostname-definitely-does-not"
-                        + "-exist-12345.com");
-
-            assertThat(result.isValid()).isFalse();
-            assertThat(result.errorMessage())
-                .contains("Cannot resolve");
-        }
-
-        @Test
-        void shouldRejectLocalhost() {
-            HostnameValidator.ValidationResult result =
-                validator.validate("localhost");
-
-            assertThat(result.isValid()).isFalse();
-            assertThat(result.errorMessage())
-                .contains("not allowed");
-        }
-
-        @Test
-        void shouldDelegateFormatValidation() {
-            HostnameValidator.ValidationResult result =
-                validator.validate("arduino_invalid");
-
-            assertThat(result.isValid()).isFalse();
-            assertThat(result.errorMessage())
-                .contains("Invalid hostname format");
+        void shouldReturnNull_whenNull() {
+            assertThat(HostnameValidator.normalize(null)).isNull();
         }
     }
 }

@@ -2,6 +2,8 @@ package com.house.sensors.sensors.restClients;
 
 import com.house.sensors.sensors.models.SensorData;
 import com.house.sensors.sensors.util.HostnameValidator;
+import io.netty.channel.ConnectTimeoutException;
+import io.netty.handler.timeout.ReadTimeoutException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -13,18 +15,18 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.UnknownHostException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 @Slf4j
 @RequiredArgsConstructor
 @Service
 public class ArduinoClient {
-    private static final Pattern NAN_PATTERN = Pattern.compile(":\\s*(?i)(nan)\\b");
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+    // Arduino's Print::printFloat emits bare nan/inf/ovf tokens, which
+    // are not valid JSON; quote them so the reading still parses.
+    private static final Pattern NON_FINITE_PATTERN =
+        Pattern.compile(":\\s*(?i)(nan|-?inf|ovf)\\b");
 
     private final WebClient client;
     private final ObjectMapper objectMapper;
@@ -67,7 +69,6 @@ public class ArduinoClient {
             .accept(MediaType.APPLICATION_JSON)
             .retrieve()
             .bodyToMono(String.class)
-            .timeout(REQUEST_TIMEOUT)
             .block();
 
         if (response == null) {
@@ -98,8 +99,8 @@ public class ArduinoClient {
     }
 
     private String sanitizeJsonResponse(String responseBody) {
-        return NAN_PATTERN.matcher(responseBody)
-            .replaceAll(": \"nan\"");
+        return NON_FINITE_PATTERN.matcher(responseBody)
+            .replaceAll(": \"$1\"");
     }
 
     private SensorData parseJsonToSensorData(String json) {
@@ -119,7 +120,8 @@ public class ArduinoClient {
             log.error("Cannot resolve hostname for Arduino "
                 + "device '{}': Device may be offline or "
                 + "hostname is incorrect", machineName);
-        } else if (cause instanceof TimeoutException) {
+        } else if (cause instanceof ConnectTimeoutException
+                || cause instanceof ReadTimeoutException) {
             log.error("Timeout connecting to Arduino device "
                 + "'{}': Device not responding", machineName);
         } else {
@@ -146,17 +148,9 @@ public class ArduinoClient {
 
     private void handleUnexpectedError(
             Exception ex, String machineName) {
-        Throwable cause = ex.getCause();
-        if (cause instanceof TimeoutException) {
-            log.error("Timeout fetching data from Arduino "
-                + "device '{}': Device not responding "
-                + "within {}s", machineName,
-                REQUEST_TIMEOUT.getSeconds());
-        } else {
-            log.error("Unexpected error (type: {}) fetching "
-                + "data from Arduino device '{}': {}",
-                ex.getClass().getSimpleName(),
-                machineName, ex.getMessage(), ex);
-        }
+        log.error("Unexpected error (type: {}) fetching "
+            + "data from Arduino device '{}': {}",
+            ex.getClass().getSimpleName(),
+            machineName, ex.getMessage(), ex);
     }
 }

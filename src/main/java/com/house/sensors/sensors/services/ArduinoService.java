@@ -32,14 +32,17 @@ public class ArduinoService {
         if (!result.isValid()) {
             throw new InvalidRequestException(result.errorMessage());
         }
-        if (arduinoRepository.existsByHostName(arduino.getHostName())) {
+        arduino.setHostName(
+            HostnameValidator.normalize(arduino.getHostName()));
+        if (arduinoRepository.existsByHostNameIgnoreCase(
+                arduino.getHostName())) {
             throw duplicateHostname(arduino.getHostName());
         }
         try {
             return arduinoRepository.save(arduino);
         } catch (DataIntegrityViolationException e) {
             // Safety net for a concurrent insert that slips past the
-            // existsByHostName check; hostname is the only unique
+            // existsByHostNameIgnoreCase check; hostname is the only unique
             // constraint, so this is always a duplicate.
             throw duplicateHostname(arduino.getHostName());
         }
